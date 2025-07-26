@@ -1,4 +1,4 @@
-use pixiv::IllustrationId;
+use nenechi_pixiv::IllustrationId;
 
 #[test]
 fn it_should_create_valid_illustration_id() {

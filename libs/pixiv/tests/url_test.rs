@@ -1,4 +1,4 @@
-use pixiv::PixivUrl;
+use nenechi_pixiv::PixivUrl;
 
 #[test]
 fn it_should_create_valid_url() {

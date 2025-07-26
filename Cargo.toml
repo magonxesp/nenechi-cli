@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    ".",
+    ".", "libs/image",
     "libs/pixiv"
 ]
 
@@ -10,4 +10,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-pixiv = { path = "libs/pixiv" }
+nenechi-pixiv = { path = "libs/pixiv" }
+nenechi-image = { path = "libs/image" }
