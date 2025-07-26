@@ -1,9 +1,19 @@
 logging:
   # Nivel de log: trace, debug, info, warn, error.
   # También se puede sobreescribir con la variable de entorno RUST_LOG.
-  level: "info"
+  level: info
   # Lista de salidas activas. Opciones: "console", "file".
-  output: "console"
+  output: console
   # Ruta del fichero de logs.
   # Solo funcionara si el output es "file"
-  file: "nenechi-cli.log"
+  file: nenechi-cli.log
+
+tidy_wallpapers:
+  # Ruta al directorio donde estan todos los wallpapers
+  all_directory: wallpapers/all
+  # Ruta al directorios donde se organizaran por aspect ratio
+  # Por ejemplo: portrait (mobile), landscape (desktop) o square
+  aspect_ratio_directory: wallpapers/by-aspect-ratio
+  # Ruta al directorios donde se organizaran por tags de Pixiv
+  # si estan disponibles
+  tags_directory: wallpapers/by-tags

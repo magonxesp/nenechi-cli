@@ -7,6 +7,7 @@ use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use serde::Deserialize;
+use crate::commands::tidy_wallpapers::TidyWallpapersConfig;
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub enum LoggingOutput {
@@ -127,13 +128,16 @@ impl LoggingConfig {
 #[derive(Debug, Deserialize)]
 pub struct CliConfig {
     #[serde(default)]
-    pub logging: LoggingConfig
+    pub logging: LoggingConfig,
+    #[serde(default)]
+    pub tidy_wallpapers: Option<TidyWallpapersConfig>
 }
 
 impl Default for CliConfig {
     fn default() -> Self {
         CliConfig {
-            logging: LoggingConfig::default()
+            logging: LoggingConfig::default(),
+            tidy_wallpapers: None
         }
     }
 }

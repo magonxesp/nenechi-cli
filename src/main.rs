@@ -29,5 +29,5 @@ fn main() {
 
     config.configure();
 
-    execute_command(args.command).unwrap();
+    execute_command(args.command, &config).unwrap();
 }
