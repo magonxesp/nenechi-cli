@@ -4,6 +4,9 @@ members = [
     "libs/pixiv"
 ]
 
+[[bin]]
+name = "nenechi-cli"
+
 [package]
 name = "nenechi-cli"
 version = "0.1.0"
@@ -12,3 +15,4 @@ edition = "2024"
 [dependencies]
 nenechi-pixiv = { path = "libs/pixiv" }
 nenechi-image = { path = "libs/image" }
+clap = { version = "4.5.41", features = ["derive"] }
