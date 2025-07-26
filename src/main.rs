@@ -11,7 +11,12 @@ use crate::config::CliConfig;
 #[command(name = "nennechi-cli")]
 #[command(about = "Utils para el servidor nenechi", long_about = None)]
 struct Cli {
-    #[arg(short, long, default_value = "config.yml")]
+    #[arg(
+        short, 
+        long, 
+        help = "Configuration file path", 
+        default_value = "config.yml"
+    )]
     config_file: String,
 
     #[command(subcommand)]
