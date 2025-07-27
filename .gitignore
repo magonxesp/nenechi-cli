@@ -1,3 +1,4 @@
 /target
-nenechi-cli.log
+*.log
 config.yml
+*.db

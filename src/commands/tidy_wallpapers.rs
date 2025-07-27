@@ -1,9 +1,31 @@
 use std::path::Path;
 
+use clap::Subcommand;
 use log::{debug, info};
 use serde::Deserialize;
-use walkdir::WalkDir;
 use std::fs;
+use walkdir::WalkDir;
+
+#[derive(Debug, Subcommand)]
+pub enum WallpapersCommand {
+    Tidy,
+    Index,
+    CleanIndex
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WallpapersConfig {
+    #[serde(default)]
+    tidy: Option<TidyWallpapersConfig>
+}
+
+impl Default for WallpapersConfig {
+    fn default() -> Self {
+        Self {
+            tidy: None
+        }
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct TidyWallpapersConfig {
@@ -64,6 +86,21 @@ impl TidyWallpapersConfig {
         }
 
         Ok(path)
+    }
+}
+
+pub fn execute_wallpapers_command(
+    command: WallpapersCommand,
+    config: &WallpapersConfig
+) -> Result<(), Box<dyn std::error::Error>> {
+    match command {
+        WallpapersCommand::Tidy => tidy_wallpapers(
+            config.tidy
+                .as_ref()
+                .ok_or("wallpapers.tidy configuration is required")?
+        ),
+        WallpapersCommand::Index => Err("Not implemented".into()),
+        WallpapersCommand::CleanIndex => Err("Not implemented".into())
     }
 }
 

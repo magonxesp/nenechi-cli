@@ -1,13 +1,13 @@
 use std::fs;
 
+use crate::commands::tidy_wallpapers::WallpapersConfig;
 use log::LevelFilter;
-use log4rs::*;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Root};
 use log4rs::encode::pattern::PatternEncoder;
+use log4rs::*;
 use serde::Deserialize;
-use crate::commands::tidy_wallpapers::TidyWallpapersConfig;
 
 #[derive(Debug, Deserialize, PartialEq)]
 pub enum LoggingOutput {
@@ -126,18 +126,45 @@ impl LoggingConfig {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct DatabaseConfig {
+    #[serde(default = "DatabaseConfig::default_file")]
+    file: String,
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self {
+            file: DatabaseConfig::default_file(),
+        }
+    }
+}
+
+impl DatabaseConfig {
+    fn default_file() -> String {
+        String::from("nenechi-cli.db")
+    }
+
+    pub fn sqlite_uri(&self) -> String {
+        format!("sqlite://{}", self.file)
+    }
+}
+
+#[derive(Debug, Deserialize)]
 pub struct CliConfig {
     #[serde(default)]
     pub logging: LoggingConfig,
     #[serde(default)]
-    pub tidy_wallpapers: Option<TidyWallpapersConfig>
+    pub wallpapers: WallpapersConfig,
+    #[serde(default)]
+    pub database: DatabaseConfig,
 }
 
 impl Default for CliConfig {
     fn default() -> Self {
-        CliConfig {
+        Self {
             logging: LoggingConfig::default(),
-            tidy_wallpapers: None
+            wallpapers: WallpapersConfig::default(),
+            database: DatabaseConfig::default(),
         }
     }
 }

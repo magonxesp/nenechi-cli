@@ -8,12 +8,18 @@ logging:
   # Solo funcionara si el output es "file"
   file: nenechi-cli.log
 
-tidy_wallpapers:
-  # Ruta al directorio donde estan todos los wallpapers
-  all_directory: wallpapers/all
-  # Ruta al directorios donde se organizaran por aspect ratio
-  # Por ejemplo: portrait (mobile), landscape (desktop) o square
-  aspect_ratio_directory: wallpapers/by-aspect-ratio
-  # Ruta al directorios donde se organizaran por tags de Pixiv
-  # si estan disponibles
-  tags_directory: wallpapers/by-tags
+database:
+  # Ruta del fichero de la base de datos
+  file: nenechi-cli.db
+
+wallpapers:
+  # Configuracion para ordenar y clasificar los wallpapers
+  tidy:
+    # Ruta al directorio donde estan todos los wallpapers
+    all_directory: wallpapers/all
+    # Ruta al directorios donde se organizaran por aspect ratio
+    # Por ejemplo: portrait (mobile), landscape (desktop) o square
+    aspect_ratio_directory: wallpapers/by-aspect-ratio
+    # Ruta al directorios donde se organizaran por tags de Pixiv
+    # si estan disponibles
+    tags_directory: wallpapers/by-tags
