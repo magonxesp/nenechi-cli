@@ -1,5 +1,5 @@
 use std::path::Path;
-use glob::{MatchOptions, Pattern};
+use glob::Pattern;
 use log::warn;
 
 pub fn path_match_any_pattern(path: &Path, patterns: Vec<String>) -> bool {
