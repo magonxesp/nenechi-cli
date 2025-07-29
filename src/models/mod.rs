@@ -1,1 +1,2 @@
-mod wallpaper_metadata;
+mod wallpaper;
+mod wallpaper_aspect_ratio;

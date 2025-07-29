@@ -3,7 +3,6 @@ use std::path::Path;
 use clap::Subcommand;
 use log::{debug, info};
 use serde::Deserialize;
-use std::fs;
 use walkdir::WalkDir;
 
 #[derive(Debug, Subcommand)]
@@ -104,7 +103,7 @@ pub fn execute_wallpapers_command(
     }
 }
 
-pub fn tidy_wallpapers(config: &TidyWallpapersConfig) -> Result<(), Box<dyn std::error::Error>> {
+fn tidy_wallpapers(config: &TidyWallpapersConfig) -> Result<(), Box<dyn std::error::Error>> {
     debug!("using config: {:?}", config);
 
     config.validate()?;

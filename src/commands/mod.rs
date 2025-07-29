@@ -1,7 +1,7 @@
-pub mod tidy_wallpapers;
+pub mod wallpapers;
 
 use clap::Subcommand;
-use tidy_wallpapers::{execute_wallpapers_command, WallpapersCommand};
+use wallpapers::{execute_wallpapers_command, WallpapersCommand};
 use crate::config::CliConfig;
 
 #[derive(Debug, Subcommand)]

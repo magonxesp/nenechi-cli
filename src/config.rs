@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::commands::tidy_wallpapers::WallpapersConfig;
+use crate::commands::wallpapers::WallpapersConfig;
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
