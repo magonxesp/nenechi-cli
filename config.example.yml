@@ -13,10 +13,14 @@ database:
   file: nenechi-cli.db
 
 wallpapers:
+  # Ruta al directorio donde estan todos los wallpapers
+  directory: wallpapers
+  # Lista de directorios o ficheros a ignorar
+  ignore:
+    - wallpapers/cats/**/*
+    - wallpapers/*.png
   # Configuracion para ordenar y clasificar los wallpapers
   tidy:
-    # Ruta al directorio donde estan todos los wallpapers
-    all_directory: wallpapers/all
     # Ruta al directorios donde se organizaran por aspect ratio
     # Por ejemplo: portrait (mobile), landscape (desktop) o square
     aspect_ratio_directory: wallpapers/by-aspect-ratio

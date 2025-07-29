@@ -2,14 +2,14 @@ mod config;
 mod commands;
 mod models;
 mod schema;
+mod fs;
 
 use clap::Parser;
 use diesel::{Connection, SqliteConnection};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use commands::Commands;
 use commands::execute_command;
-
-use crate::config::CliConfig;
+use config::CliConfig;
 
 #[derive(Debug, Parser)]
 #[command(name = "nennechi-cli")]

@@ -1,12 +1,9 @@
-use std::fs;
-
-use crate::commands::wallpapers::WallpapersConfig;
-use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
+use log4rs::Config;
 use log4rs::config::{Appender, Root};
 use log4rs::encode::pattern::PatternEncoder;
-use log4rs::*;
+use log::LevelFilter;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -72,7 +69,7 @@ impl Default for LoggingConfig {
             output: LoggingOutput::default(),
             file: LoggingConfig::default_file()
         }
-    }   
+    }
 }
 
 impl LoggingConfig {
@@ -122,67 +119,5 @@ impl LoggingConfig {
 
     fn default_file() -> String {
         String::from("nenechi-cli.log")
-    }    
-}
-
-#[derive(Debug, Deserialize)]
-pub struct DatabaseConfig {
-    #[serde(default = "DatabaseConfig::default_file")]
-    file: String,
-}
-
-impl Default for DatabaseConfig {
-    fn default() -> Self {
-        Self {
-            file: DatabaseConfig::default_file(),
-        }
-    }
-}
-
-impl DatabaseConfig {
-    fn default_file() -> String {
-        String::from("nenechi-cli.db")
-    }
-
-    pub fn sqlite_uri(&self) -> String {
-        format!("sqlite://{}", self.file)
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CliConfig {
-    #[serde(default)]
-    pub logging: LoggingConfig,
-    #[serde(default)]
-    pub wallpapers: WallpapersConfig,
-    #[serde(default)]
-    pub database: DatabaseConfig,
-}
-
-impl Default for CliConfig {
-    fn default() -> Self {
-        Self {
-            logging: LoggingConfig::default(),
-            wallpapers: WallpapersConfig::default(),
-            database: DatabaseConfig::default(),
-        }
-    }
-}
-
-impl CliConfig {
-    pub fn read(path: &str) -> Self {
-        let exists = fs::exists(path).unwrap();
-
-        if !exists {
-            dbg!("Using default configuration because the configuration file {} does not exist", path);
-            return CliConfig::default();
-        }
-
-        let content = fs::read_to_string(&path).unwrap();
-        serde_yaml::from_str(&content).unwrap()
-    }
-
-    pub fn configure(&self) {
-        self.logging.apply_configuration();
     }
 }
