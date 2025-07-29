@@ -6,6 +6,7 @@ use log::{debug, info};
 use serde::Deserialize;
 use walkdir::{DirEntry, WalkDir};
 use crate::config::{TidyWallpapersConfig, WallpapersConfig};
+use crate::fs::path_match_any_pattern;
 
 #[derive(Debug, Subcommand)]
 pub enum WallpapersCommand {
@@ -50,15 +51,17 @@ fn index_wallpapers(config: &WallpapersConfig) -> Result<(), Box<dyn std::error:
 }
 
 fn walk_wallpapers_directory(config: &WallpapersConfig) -> Result<impl Iterator<Item = Result<DirEntry, walkdir::Error>>, Box<dyn std::error::Error>> {
+    let patterns = config.ignore.clone();
     let entry_filter = move |entry: &DirEntry| {
         if !entry.file_type().is_file() || entry.file_type().is_symlink() {
             debug!("path excluded because is not a file or is a symlink: {}", entry.path().display());
             return false;
         }
 
-        let ignore_patterns = glob(&config.ignore.join("|")).unwrap();
-
-
+        if !patterns.is_empty() && path_match_any_pattern(entry.path(), &patterns) {
+            debug!("path excluded because is ignored: {}", entry.path().display());
+            return false;
+        }
 
         true
     };

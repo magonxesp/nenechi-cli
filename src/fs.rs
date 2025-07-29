@@ -2,7 +2,7 @@ use std::path::Path;
 use glob::Pattern;
 use log::warn;
 
-pub fn path_match_any_pattern(path: &Path, patterns: Vec<String>) -> bool {
+pub fn path_match_any_pattern(path: &Path, patterns: &[String]) -> bool {
     let mut valid_patterns = vec![];
 
     for pattern in patterns {
@@ -28,7 +28,7 @@ mod tests {
 
     #[test]
     fn path_match_any_pattern_returns_true_for_matching_path() {
-        let patterns = vec![
+        let patterns = [
             "**/wallpapers/*.mp4".to_string(),
             "wallpapers/*.avi".to_string(),
             "wallpapers/**/*.png".to_string(),
@@ -39,47 +39,47 @@ mod tests {
 
         assert_eq!(true, path_match_any_pattern(
             Path::new("/Users/megumin/Images/wallpapers/dogs.mp4"),
-            patterns.clone()
+            &patterns
         ));
 
         assert_eq!(true, path_match_any_pattern(
             Path::new("wallpapers/dogs.avi"),
-            patterns.clone()
+            &patterns
         ));
 
         assert_eq!(true, path_match_any_pattern(
             Path::new("wallpapers/landscapes/mountain.png"),
-            patterns.clone()
+            &patterns
         ));
 
         assert_eq!(true, path_match_any_pattern(
             Path::new("wallpapers/cats"),
-            patterns.clone()
+            &patterns
         ));
 
         assert_eq!(true, path_match_any_pattern(
             Path::new("wallpapers/cats/my_favorites"),
-            patterns.clone()
+            &patterns
         ));
 
         assert_eq!(true, path_match_any_pattern(
             Path::new("wallpapers/cats/my_favorites/white-cat.png"),
-            patterns.clone()
+            &patterns
         ));
 
         assert_eq!(true, path_match_any_pattern(
             Path::new("wallpapers/cities/london/museum"),
-            patterns.clone()
+            &patterns
         ));
 
         assert_eq!(true, path_match_any_pattern(
             Path::new("wallpapers/cities/london/big-ben.jpeg"),
-            patterns.clone()
+            &patterns
         ));
 
         assert_eq!(true, path_match_any_pattern(
             Path::new("wallpapers/cities/london/river/boat.jpeg"),
-            patterns.clone()
+            &patterns
         ));
     }
 }
