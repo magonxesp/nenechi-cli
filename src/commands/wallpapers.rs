@@ -1,12 +1,12 @@
 use std::path::Path;
 
+use crate::config::{TidyWallpapersConfig, WallpapersConfig};
+use crate::fs::path_match_any_pattern;
 use clap::Subcommand;
 use glob::glob;
 use log::{debug, info};
 use serde::Deserialize;
 use walkdir::{DirEntry, WalkDir};
-use crate::config::{TidyWallpapersConfig, WallpapersConfig};
-use crate::fs::path_match_any_pattern;
 
 #[derive(Debug, Subcommand)]
 pub enum WallpapersCommand {
@@ -47,6 +47,13 @@ fn tidy_wallpapers(config: &WallpapersConfig) -> Result<(), Box<dyn std::error::
 
 fn index_wallpapers(config: &WallpapersConfig) -> Result<(), Box<dyn std::error::Error>> {
     debug!("using config: {:?}", config);
+    // TODO: recorrer ficheros con walk_wallpapers_directory y llamar al endpoint de pixiv para
+    // recuperar los tags
+    for file in walk_wallpapers_directory(config)? {
+
+    }
+
+
     Ok(())
 }
 
