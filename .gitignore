@@ -2,3 +2,4 @@
 *.log
 config.yml
 *.db
+.idea
