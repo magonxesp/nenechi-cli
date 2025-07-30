@@ -1,29 +1,38 @@
+use std::path::Path;
+use image::DynamicImage;
+use crate::AspectRatio;
+
 #[derive(Debug)]
 pub struct ImageDetails {
     pub width: u32,
-    pub height: u32
+    pub height: u32,
+    pub aspect_ratio: AspectRatio,
 }
 
 impl ImageDetails {
-    pub fn read_from_path(path: &str) -> Result<Self, String> {
+    pub fn read_from_path(path: &Path) -> Result<Self, String> {
         let metadata = image::open(path)
             .map_err(|e| e.to_string())?;
 
         Ok(Self {
             width: metadata.width(),
-            height: metadata.height()
+            height: metadata.height(),
+            aspect_ratio: Self::resolve_aspect_ratio(&metadata),
         })
     }
 
-    pub fn is_landscape(&self) -> bool {
-        self.width > self.height
-    }
+    fn resolve_aspect_ratio(metadata: &DynamicImage) -> AspectRatio {
+        let width = metadata.width();
+        let height = metadata.height();
 
-    pub fn is_portrait(&self) -> bool {
-        self.width < self.height
-    }
+        if width > height {
+            return AspectRatio::Landscape;
+        }
 
-    pub fn is_square(&self) -> bool {
-        self.width == self.height
+        if width < height {
+            return AspectRatio::Portrait;
+        }
+
+        AspectRatio::Square
     }
 }

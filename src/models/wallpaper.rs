@@ -1,12 +1,15 @@
+use std::path::Path;
 use diesel::prelude::*;
-use crate::models::wallpaper_aspect_ratio::WallpaperAspectRatio;
+use nenechi_image::AspectRatio;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Wallpaper {
     pub id: String,
     pub pixiv_illustration_id: Option<String>,
     pub tags: Vec<String>,
-    pub aspect_ratio: WallpaperAspectRatio,
+    pub aspect_ratio: AspectRatio,
+    pub path: String,
+    pub file_name: String,
 }
 
 #[derive(Queryable, Selectable, Insertable)]
@@ -17,6 +20,8 @@ pub struct WallpaperTable {
     pixiv_illustration_id: Option<String>,
     tags: String,
     aspect_ratio: String,
+    path: String,
+    file_name: String,
 }
 
 impl TryFrom<Wallpaper> for WallpaperTable {
@@ -28,6 +33,8 @@ impl TryFrom<Wallpaper> for WallpaperTable {
             pixiv_illustration_id: value.pixiv_illustration_id,
             tags: serde_json::to_string(&value.tags)?,
             aspect_ratio: value.aspect_ratio.to_string(),
+            path: value.path,
+            file_name: value.file_name,
         })
     }
 }
@@ -40,7 +47,9 @@ impl TryFrom<WallpaperTable> for Wallpaper {
             id: value.id,
             pixiv_illustration_id: value.pixiv_illustration_id,
             tags: serde_json::from_str(&value.tags)?,
-            aspect_ratio: WallpaperAspectRatio::from_string(&value.aspect_ratio)?,
+            aspect_ratio: AspectRatio::from_string(&value.aspect_ratio)?,
+            path: value.path,
+            file_name: value.file_name,
         })
     }
 }

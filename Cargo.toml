@@ -26,3 +26,4 @@ diesel = { version = "2.2.0", features = ["sqlite", "serde_json"] }
 diesel_migrations = "2.2.0"
 serde_json = "1.0.141"
 glob = "0.3.2"
+uuid = { version = "1.8.0", features = ["v4", "v7"] }

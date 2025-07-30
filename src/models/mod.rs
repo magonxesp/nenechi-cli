@@ -1,2 +1,3 @@
 mod wallpaper;
-mod wallpaper_aspect_ratio;
+
+pub use wallpaper::*;

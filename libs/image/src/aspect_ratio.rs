@@ -1,11 +1,11 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum WallpaperAspectRatio {
+pub enum AspectRatio {
     Landscape,
     Portrait,
     Square,
 }
 
-impl WallpaperAspectRatio {
+impl AspectRatio {
     pub fn from_string(value: &String) -> Result<Self, String> {
         match value.as_str() {
             "landscape" => Ok(Self::Landscape),

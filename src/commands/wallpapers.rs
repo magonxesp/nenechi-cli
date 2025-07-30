@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::path::Path;
 
 use crate::config::{TidyWallpapersConfig, WallpapersConfig};
@@ -6,7 +7,11 @@ use clap::Subcommand;
 use glob::glob;
 use log::{debug, info};
 use serde::Deserialize;
+use uuid::{NoContext, Timestamp, Uuid};
 use walkdir::{DirEntry, WalkDir};
+use nenechi_image::ImageDetails;
+use nenechi_pixiv::{fetch_tags, IllustrationId};
+use crate::models::Wallpaper;
 
 #[derive(Debug, Subcommand)]
 pub enum WallpapersCommand {
@@ -47,12 +52,40 @@ fn tidy_wallpapers(config: &WallpapersConfig) -> Result<(), Box<dyn std::error::
 
 fn index_wallpapers(config: &WallpapersConfig) -> Result<(), Box<dyn std::error::Error>> {
     debug!("using config: {:?}", config);
-    // TODO: recorrer ficheros con walk_wallpapers_directory y llamar al endpoint de pixiv para
-    // recuperar los tags
+
     for file in walk_wallpapers_directory(config)? {
+        let file = file?;
+        let path = file.path();
+        debug!("indexing wallpaper: {}", path.display());
 
+        let id = Uuid::new_v7(Timestamp::now(NoContext))
+            .to_string();
+        let illustration_id = IllustrationId::from_path(path)?;
+        let tags = fetch_tags(&illustration_id)?
+            .into_iter()
+            .map(|tag| tag.translation.en)
+            .collect();
+        let image_details = ImageDetails::read_from_path(path)?;
+        let path_string = path.to_str()
+            .ok_or(format!("unable to cast to string path {}", path.display()))?
+            .to_string();
+        let file_name = path.file_name()
+            .ok_or(format!("unable to get file name for {}", path.display()))?
+            .to_str()
+            .ok_or(format!("unable to cast file name to string for {}", path.display()))?
+            .to_string();
+
+        let wallpaper = Wallpaper {
+            id,
+            pixiv_illustration_id: Some(illustration_id.value),
+            tags,
+            aspect_ratio: image_details.aspect_ratio,
+            path: path_string,
+            file_name,
+        };
+
+        // TODO: save wallpaper to sqlite
     }
-
 
     Ok(())
 }
