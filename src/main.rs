@@ -29,6 +29,11 @@ struct Cli {
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
 
+struct ApplicationContext<'a> {
+    config: CliConfig,
+    db_connection: &'a mut SqliteConnection,
+}
+
 fn main() {
     let args = Cli::parse();
     let config = CliConfig::read(args.config_file.as_str());
@@ -40,5 +45,10 @@ fn main() {
     db_connection.run_pending_migrations(MIGRATIONS)
         .expect("Error running migrations");
 
-    execute_command(args.command, &config).unwrap();
+    let context = ApplicationContext {
+        config,
+        db_connection: &mut db_connection,
+    };
+
+    execute_command(args.command, &context).unwrap();
 }

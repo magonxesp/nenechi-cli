@@ -1,6 +1,7 @@
 use std::path::Path;
 use regex::Regex;
 
+#[derive(Clone)]
 pub struct IllustrationId {
     pub value: String
 }
