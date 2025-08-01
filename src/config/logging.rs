@@ -6,7 +6,7 @@ use log4rs::encode::pattern::PatternEncoder;
 use log::LevelFilter;
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone, Copy)]
 pub enum LoggingOutput {
     #[serde(rename = "console")]
     Console,
@@ -20,7 +20,7 @@ impl Default for LoggingOutput {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, Copy)]
 pub enum LoggingLevel {
     #[serde(rename = "trace")]
     Trace,
@@ -52,7 +52,7 @@ impl LoggingLevel {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct LoggingConfig {
     #[serde(default)]
     pub level: LoggingLevel,
@@ -82,7 +82,7 @@ impl LoggingConfig {
         log4rs::init_config(config).unwrap();
     }
 
-    fn configure_console_logger(&self) -> log4rs::Config {
+    fn configure_console_logger(&self) -> Config {
         let stdout = ConsoleAppender::builder().build();
 
         let appender = Appender::builder()
@@ -98,7 +98,7 @@ impl LoggingConfig {
             .unwrap()
     }
 
-    fn configure_file_logger(&self) -> log4rs::Config {
+    fn configure_file_logger(&self) -> Config {
         let file = FileAppender::builder()
             .encoder(Box::new(PatternEncoder::new("{d} - {m}{n}")))
             .build(&self.file)

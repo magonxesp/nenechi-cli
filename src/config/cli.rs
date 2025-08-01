@@ -3,7 +3,7 @@ use std::fs;
 use serde::Deserialize;
 use crate::config::{DatabaseConfig, LoggingConfig, WallpapersConfig};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct CliConfig {
     #[serde(default)]
     pub logging: LoggingConfig,

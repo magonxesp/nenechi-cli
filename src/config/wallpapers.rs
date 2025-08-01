@@ -1,7 +1,7 @@
 use std::path::Path;
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct WallpapersConfig {
     #[serde(default)]
     directory: String,
@@ -43,7 +43,7 @@ impl WallpapersConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct TidyWallpapersConfig {
     #[serde(default)]
     aspect_ratio_directory: String,

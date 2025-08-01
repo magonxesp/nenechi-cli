@@ -1,20 +1,29 @@
 pub mod wallpapers;
 
-use clap::Subcommand;
-use wallpapers::{execute_wallpapers_command, WallpapersCommand};
-use crate::ApplicationContext;
+use crate::commands::wallpapers::execute_wallpaper_command;
 use crate::config::CliConfig;
+use clap::Subcommand;
+use diesel::SqliteConnection;
+use wallpapers::WallpapersCommands;
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     Wallpapers {
         #[command(subcommand)]
-        command: WallpapersCommand,
+        command: WallpapersCommands,
     }
 }
 
-pub fn execute_command(command: Commands, context: &mut ApplicationContext) -> Result<(), Box<dyn std::error::Error>> {
+pub fn execute_command(
+    command: Commands,
+    config: &CliConfig,
+    db_connection: &mut SqliteConnection
+) -> Result<(), Box<dyn std::error::Error>> {
     match command {
-        Commands::Wallpapers { command } => execute_wallpapers_command(command, context),
+        Commands::Wallpapers { command } => execute_wallpaper_command(
+            command,
+            config.wallpapers.clone(),
+            db_connection
+        ),
     }
 }

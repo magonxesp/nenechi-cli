@@ -28,21 +28,16 @@ struct Cli {
     command: Commands,
 }
 
-struct ApplicationContext<'a> {
-    config: CliConfig,
-    db_connection: &'a mut SqliteConnection,
-}
-
 fn main() {
     let args = Cli::parse();
     let config = CliConfig::read(args.config_file.as_str());
     config.configure();
 
     let mut db_connection = create_db_connection(&config.database);
-    let mut context = ApplicationContext {
-        config,
-        db_connection: &mut db_connection,
-    };
 
-    execute_command(args.command, &mut context).unwrap();
+    execute_command(
+        args.command,
+        &config,
+        &mut db_connection
+    ).unwrap();
 }
