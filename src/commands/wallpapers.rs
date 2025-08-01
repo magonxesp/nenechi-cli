@@ -59,7 +59,17 @@ fn index_wallpapers(context: &mut ApplicationContext) -> Result<(), Box<dyn std:
     for file in walk_wallpapers_directory(config)? {
         let file = file?;
         let path = file.path();
-        debug!("indexing wallpaper: {}", path.display());
+        let path_string = path.to_str()
+            .ok_or(format!("unable to cast to string path {}", path.display()))?
+            .to_string();
+        debug!("indexing wallpaper: {}", &path_string);
+
+        let existing = wallpapers_repository.find_by_path(&path_string)?;
+
+        if existing.is_some() {
+            debug!("wallpaper already indexed: {}", &path_string);
+            continue;
+        }
 
         let id = Uuid::new_v7(Timestamp::now(NoContext))
             .to_string();
@@ -74,9 +84,6 @@ fn index_wallpapers(context: &mut ApplicationContext) -> Result<(), Box<dyn std:
         }
 
         let image_details = ImageDetails::read_from_path(path)?;
-        let path_string = path.to_str()
-            .ok_or(format!("unable to cast to string path {}", path.display()))?
-            .to_string();
         let file_name = path.file_name()
             .ok_or(format!("unable to get file name for {}", path.display()))?
             .to_str()
@@ -92,7 +99,8 @@ fn index_wallpapers(context: &mut ApplicationContext) -> Result<(), Box<dyn std:
             file_name,
         };
 
-        wallpapers_repository.save(wallpaper)?
+        wallpapers_repository.save(&wallpaper)?;
+        debug!("wallpaper indexed: {}", &wallpaper.path)
     }
 
     Ok(())

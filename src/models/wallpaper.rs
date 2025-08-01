@@ -97,7 +97,7 @@ impl<'a> WallpaperRepository<'a> {
         }
     }
 
-    pub fn save(&mut self, wallpaper: Wallpaper) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save(&mut self, wallpaper: &Wallpaper) -> Result<(), Box<dyn std::error::Error>> {
         let table_model: WallpaperTable = wallpaper.clone().try_into()?;
         let existing = self.find_by_id(&wallpaper.id)?;
 
@@ -160,7 +160,7 @@ mod tests {
         let mut repository = WallpaperRepository::new(&mut db_connection);
         let wallpaper = Wallpaper::test();
 
-        repository.save(wallpaper.clone()).unwrap();
+        repository.save(&wallpaper).unwrap();
 
         let result: Option<WallpaperTable> = wallpapers::table
             .find(&wallpaper.id)
@@ -189,7 +189,7 @@ mod tests {
         wallpaper.path = "wallpapers/aqua.jpeg".to_string();
         wallpaper.file_name = "aqua.jpeg".to_string();
 
-        repository.save(wallpaper.clone()).unwrap();
+        repository.save(&wallpaper).unwrap();
 
         let result: Option<WallpaperTable> = wallpapers::table
             .find(&wallpaper.id)
@@ -209,7 +209,7 @@ mod tests {
         let mut repository = WallpaperRepository::new(&mut db_connection);
         let wallpaper = Wallpaper::test();
 
-        repository.save(wallpaper.clone()).unwrap();
+        repository.save(&wallpaper).unwrap();
         let existing = repository.find_by_id(&wallpaper.id).unwrap();
 
         assert_eq!(wallpaper, existing.unwrap());
@@ -231,7 +231,7 @@ mod tests {
         let mut repository = WallpaperRepository::new(&mut db_connection);
         let wallpaper = Wallpaper::test();
 
-        repository.save(wallpaper.clone()).unwrap();
+        repository.save(&wallpaper).unwrap();
         let existing = repository.find_by_path(&wallpaper.path).unwrap();
 
         assert_eq!(wallpaper, existing.unwrap());
