@@ -13,8 +13,8 @@ pub enum Commands {
     }
 }
 
-pub fn execute_command(command: Commands, context: &ApplicationContext) -> Result<(), Box<dyn std::error::Error>> {
+pub fn execute_command(command: Commands, context: &mut ApplicationContext) -> Result<(), Box<dyn std::error::Error>> {
     match command {
-        Commands::Wallpapers { command } => execute_wallpapers_command(command, &context),
+        Commands::Wallpapers { command } => execute_wallpapers_command(command, context),
     }
 }

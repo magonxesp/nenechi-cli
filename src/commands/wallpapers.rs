@@ -23,7 +23,7 @@ pub enum WallpapersCommand {
 
 pub fn execute_wallpapers_command(
     command: WallpapersCommand,
-    context: &ApplicationContext
+    context: &mut ApplicationContext
 ) -> Result<(), Box<dyn std::error::Error>> {
     match command {
         WallpapersCommand::Tidy => tidy_wallpapers(&context.config.wallpapers),
@@ -51,9 +51,9 @@ fn tidy_wallpapers(config: &WallpapersConfig) -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
-fn index_wallpapers(context: &ApplicationContext) -> Result<(), Box<dyn std::error::Error>> {
+fn index_wallpapers(context: &mut ApplicationContext) -> Result<(), Box<dyn std::error::Error>> {
     let config = &context.config.wallpapers;
-    let wallpapers_repository = WallpaperRepository::new(&mut context.db_connection);
+    let mut wallpapers_repository = WallpaperRepository::new(&mut context.db_connection);
     debug!("using config: {:?}", config);
 
     for file in walk_wallpapers_directory(config)? {
@@ -92,7 +92,7 @@ fn index_wallpapers(context: &ApplicationContext) -> Result<(), Box<dyn std::err
             file_name,
         };
 
-        // TODO: save wallpaper to sqlite
+        wallpapers_repository.save(wallpaper)?
     }
 
     Ok(())

@@ -3,13 +3,14 @@ mod commands;
 mod models;
 mod schema;
 mod fs;
+mod database;
 
+use crate::database::create_db_connection;
 use clap::Parser;
-use diesel::{Connection, SqliteConnection};
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use commands::Commands;
 use commands::execute_command;
+use commands::Commands;
 use config::CliConfig;
+use diesel::SqliteConnection;
 
 #[derive(Debug, Parser)]
 #[command(name = "nennechi-cli")]
@@ -27,8 +28,6 @@ struct Cli {
     command: Commands,
 }
 
-const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
-
 struct ApplicationContext<'a> {
     config: CliConfig,
     db_connection: &'a mut SqliteConnection,
@@ -39,16 +38,11 @@ fn main() {
     let config = CliConfig::read(args.config_file.as_str());
     config.configure();
 
-    let mut db_connection = SqliteConnection::establish(&config.database.sqlite_uri())
-        .unwrap_or_else(|_| panic!("Error connecting to {}", config.database.sqlite_uri()));
-
-    db_connection.run_pending_migrations(MIGRATIONS)
-        .expect("Error running migrations");
-
-    let context = ApplicationContext {
+    let mut db_connection = create_db_connection(&config.database);
+    let mut context = ApplicationContext {
         config,
         db_connection: &mut db_connection,
     };
 
-    execute_command(args.command, &context).unwrap();
+    execute_command(args.command, &mut context).unwrap();
 }

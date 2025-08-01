@@ -1,10 +1,6 @@
-use std::path::Path;
-use diesel::associations::HasTable;
-use diesel::prelude::*;
-use diesel::result::Error;
-use log::warn;
-use nenechi_image::AspectRatio;
 use crate::schema::wallpapers;
+use diesel::prelude::*;
+use nenechi_image::AspectRatio;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Wallpaper {
@@ -77,7 +73,7 @@ impl<'a> WallpaperRepository<'a> {
         Self { connection }
     }
 
-    pub fn find_by_id(&self, id: &str) -> Result<Option<Wallpaper>, Box<dyn std::error::Error>> {
+    pub fn find_by_id(&mut self, id: &str) -> Result<Option<Wallpaper>, Box<dyn std::error::Error>> {
         let result: Option<WallpaperTable> = wallpapers::table
             .find(id)
             .first(self.connection)
@@ -89,7 +85,19 @@ impl<'a> WallpaperRepository<'a> {
         }
     }
 
-    pub fn save(&self, wallpaper: Wallpaper) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn find_by_path(&mut self, path: &str) -> Result<Option<Wallpaper>, Box<dyn std::error::Error>> {
+        let result: Option<WallpaperTable> = wallpapers::table
+            .filter(wallpapers::path.eq(path))
+            .first(self.connection)
+            .optional()?;
+
+        match result {
+            Some(table_model) => Ok(Some(table_model.try_into()?)),
+            None => Ok(None)
+        }
+    }
+
+    pub fn save(&mut self, wallpaper: Wallpaper) -> Result<(), Box<dyn std::error::Error>> {
         let table_model: WallpaperTable = wallpaper.clone().try_into()?;
         let existing = self.find_by_id(&wallpaper.id)?;
 
@@ -102,14 +110,14 @@ impl<'a> WallpaperRepository<'a> {
         Ok(())
     }
 
-    fn insert(&self, table_model: &WallpaperTable) -> Result<(), Box<dyn std::error::Error>> {
+    fn insert(&mut self, table_model: &WallpaperTable) -> Result<(), Box<dyn std::error::Error>> {
         diesel::insert_into(wallpapers::table)
             .values(table_model)
             .execute(self.connection)?;
         Ok(())
     }
 
-    fn update(&self, table_model: &WallpaperTable) -> Result<(), Box<dyn std::error::Error>> {
+    fn update(&mut self, table_model: &WallpaperTable) -> Result<(), Box<dyn std::error::Error>> {
         diesel::update(wallpapers::table)
             .filter(wallpapers::id.eq(&table_model.id))
             .set((
@@ -121,5 +129,121 @@ impl<'a> WallpaperRepository<'a> {
             ))
             .execute(self.connection)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::database::tests::test_db_connection;
+    use crate::models::{Wallpaper, WallpaperRepository, WallpaperTable};
+    use crate::schema::wallpapers;
+    use diesel::{OptionalExtension, QueryDsl, RunQueryDsl};
+    use nenechi_image::AspectRatio;
+    use uuid::Uuid;
+
+    impl Wallpaper {
+        fn test() -> Self {
+            Self {
+                id: Uuid::now_v7().to_string(),
+                pixiv_illustration_id: None,
+                tags: vec!["konosuba".to_string(), "megumin".to_string()],
+                path: "wallpapers/megumin.jpeg".to_string(),
+                file_name: "megumin.jpeg".to_string(),
+                aspect_ratio: AspectRatio::Square
+            }
+        }
+    }
+
+    #[test]
+    fn wallpaper_repository_save_should_insert_new_wallpaper() {
+        let mut db_connection = test_db_connection();
+        let mut repository = WallpaperRepository::new(&mut db_connection);
+        let wallpaper = Wallpaper::test();
+
+        repository.save(wallpaper.clone()).unwrap();
+
+        let result: Option<WallpaperTable> = wallpapers::table
+            .find(&wallpaper.id)
+            .first(&mut db_connection)
+            .optional()
+            .unwrap();
+        let existing = result.unwrap()
+            .try_into()
+            .unwrap();
+
+        assert_eq!(wallpaper, existing);
+    }
+
+    #[test]
+    fn wallpaper_repository_save_should_update_existing_wallpaper() {
+        let mut db_connection = test_db_connection();
+        let mut repository = WallpaperRepository::new(&mut db_connection);
+        let mut wallpaper = Wallpaper::test();
+
+        repository.insert(
+            &wallpaper.clone()
+                .try_into()
+                .unwrap()
+        ).unwrap();
+
+        wallpaper.path = "wallpapers/aqua.jpeg".to_string();
+        wallpaper.file_name = "aqua.jpeg".to_string();
+
+        repository.save(wallpaper.clone()).unwrap();
+
+        let result: Option<WallpaperTable> = wallpapers::table
+            .find(&wallpaper.id)
+            .first(&mut db_connection)
+            .optional()
+            .unwrap();
+        let existing = result.unwrap()
+            .try_into()
+            .unwrap();
+
+        assert_eq!(wallpaper, existing);
+    }
+
+    #[test]
+    fn wallpaper_repository_find_by_id_should_find_existing() {
+        let mut db_connection = test_db_connection();
+        let mut repository = WallpaperRepository::new(&mut db_connection);
+        let wallpaper = Wallpaper::test();
+
+        repository.save(wallpaper.clone()).unwrap();
+        let existing = repository.find_by_id(&wallpaper.id).unwrap();
+
+        assert_eq!(wallpaper, existing.unwrap());
+    }
+
+    #[test]
+    fn wallpaper_repository_find_by_id_should_not_find_not_existing() {
+        let mut db_connection = test_db_connection();
+        let mut repository = WallpaperRepository::new(&mut db_connection);
+
+        let existing = repository.find_by_id("not_exists").unwrap();
+
+        assert_eq!(None, existing);
+    }
+
+    #[test]
+    fn wallpaper_repository_find_by_path_should_find_existing() {
+        let mut db_connection = test_db_connection();
+        let mut repository = WallpaperRepository::new(&mut db_connection);
+        let wallpaper = Wallpaper::test();
+
+        repository.save(wallpaper.clone()).unwrap();
+        let existing = repository.find_by_path(&wallpaper.path).unwrap();
+
+        assert_eq!(wallpaper, existing.unwrap());
+    }
+
+    #[test]
+    fn wallpaper_repository_find_by_path_should_not_find_not_existing() {
+        let mut db_connection = test_db_connection();
+        let mut repository = WallpaperRepository::new(&mut db_connection);
+
+        let existing = repository.find_by_path("path/not/exists").unwrap();
+
+        assert_eq!(None, existing);
     }
 }

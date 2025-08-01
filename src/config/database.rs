@@ -23,3 +23,27 @@ impl DatabaseConfig {
         format!("sqlite://{}", self.file)
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use std::fs;
+    use std::path::Path;
+    use crate::config::DatabaseConfig;
+
+    impl DatabaseConfig {
+        /// Create a new database configuration for tests
+        pub fn test() -> Self {
+            Self {
+                file: ":memory:".to_string()
+            }
+        }
+
+        pub fn delete_database_file(&self) {
+            let path = Path::new(&self.file);
+
+            if path.exists() {
+                fs::remove_file(path).unwrap()
+            }
+        }
+    }
+}
