@@ -10,7 +10,11 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
-RUN apt update && apt install -y libsqlite3-0 libssl3
+RUN apt update && apt install -y \
+    libsqlite3-0 \
+    libssl3 \
+    ca-certificates \
+    && update-ca-certificates
 
 COPY --from=build /builder/target/release/nenechi-cli .
 RUN chmod +x /app/nenechi-cli
