@@ -1,6 +1,7 @@
 /target
 *.log
-config.yml
+config.*.yml
+!config.example.yml
 *.db
 .idea
 sqlite
