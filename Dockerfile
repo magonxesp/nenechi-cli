@@ -16,6 +16,12 @@ RUN apt update && apt install -y \
     ca-certificates \
     && update-ca-certificates
 
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+ENV SSL_CERT_DIR=/etc/ssl/certs
+ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+ENV RUST_BACKTRACE=0
+ENV RUST_LOG=info
+
 COPY --from=build /builder/target/release/nenechi-cli .
 RUN chmod +x /app/nenechi-cli
 
