@@ -3,6 +3,8 @@ mod illustration_urls;
 mod url;
 mod client;
 mod id;
+mod http;
+mod response;
 
 pub use illustration_tags::*;
 pub use illustration_urls::*;

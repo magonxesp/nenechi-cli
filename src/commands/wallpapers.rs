@@ -4,7 +4,7 @@ use crate::fs::path_match_any_pattern;
 use crate::models::{Wallpaper, WallpaperRepository};
 use clap::Subcommand;
 use log::{debug, info};
-use nenechi_image::ImageDetails;
+use nenechi_image::{is_image_file, ImageDetails};
 use nenechi_pixiv::{fetch_tags, IllustrationId};
 use std::thread::sleep;
 use std::time::Duration;
@@ -60,8 +60,17 @@ fn index(
     directory: &Path,
     wallpapers_repository: &mut WallpaperRepository
 ) -> Result<(), Box<dyn std::error::Error>> {
-    for file in walk_directory(ignore_patterns, directory)? {
+    info!("indexing wallpapers for directory: {}", directory.display());
+
+    let walker = walk_directory(ignore_patterns, directory)?;
+
+    for file in walker {
         let file = file?;
+        if !file.file_type().is_file() || !is_image_file(file.path()) {
+            debug!("file is not an image, skipping: {}", file.path().display());
+            continue
+        }
+
         index_file(file, wallpapers_repository)?
     }
 
@@ -80,25 +89,14 @@ fn index_file(
     debug!("indexing wallpaper: {}", &path_string);
 
     let existing = wallpapers_repository.find_by_path(&path_string)?;
-
     if existing.is_some() {
         debug!("wallpaper already indexed: {}", &path_string);
         return Ok(());
     }
 
-    let id = Uuid::new_v7(Timestamp::now(NoContext))
-        .to_string();
+    let id = Uuid::new_v7(Timestamp::now(NoContext)).to_string();
     let illustration_id = IllustrationId::from_path(path).ok();
-    let mut tags: Vec<String> = vec![];
-
-    if let Some(illustration_id) = illustration_id.clone() {
-        tags = fetch_tags(&illustration_id)?
-            .into_iter()
-            .map(|tag| tag.translation.en)
-            .collect();
-        sleep(Duration::from_millis(300));
-    }
-
+    let tags = resolve_image_tags(path);
     let image_details = ImageDetails::read_from_path(path)?;
     let file_name = path.file_name()
         .ok_or(format!("unable to get file name for {}", path.display()))?
@@ -120,13 +118,38 @@ fn index_file(
     Ok(())
 }
 
+fn resolve_image_tags(path: &Path) -> Vec<String> {
+    let illustration_id = match IllustrationId::from_path(path) {
+        Ok(id) => id,
+        Err(e) => {
+            debug!("error resolving Pixiv illustration id for path {}: {}; ", path.display(), e);
+            return vec![]
+        }
+    };
+
+    let tags = match fetch_tags(&illustration_id) {
+        Ok(tags) => tags,
+        Err(e) => {
+            debug!("failed fetching Pixiv tags for path {}: {}", path.display(), e);
+            return vec![]
+        }
+    };
+
+    sleep(Duration::from_millis(300));
+    tags.iter()
+        .map(|tag| tag.translation.en.clone())
+        .collect()
+}
+
 fn walk_directory(
     ignore_patterns: Vec<String>,
     directory: &Path
 ) -> Result<impl Iterator<Item = Result<DirEntry, walkdir::Error>> + use<>, Box<dyn std::error::Error>> {
+    debug!("walking directory: {}", directory.display());
+
     let entry_filter = move |entry: &DirEntry| {
-        if !entry.file_type().is_file() || entry.file_type().is_symlink() {
-            debug!("path excluded because is not a file or is a symlink: {}", entry.path().display());
+        if entry.file_type().is_symlink() {
+            debug!("path excluded because is a symlink: {}", entry.path().display());
             return false;
         }
 
