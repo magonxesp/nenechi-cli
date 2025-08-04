@@ -1,0 +1,9 @@
+/target
+*.log
+config.yml
+*.db
+.idea
+Dockerfile
+pixiv-ajax-response.json
+README.md
+.editorconfig
