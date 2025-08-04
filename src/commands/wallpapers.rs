@@ -3,7 +3,7 @@ use crate::config::WallpapersConfig;
 use crate::fs::path_match_any_pattern;
 use crate::models::{Wallpaper, WallpaperRepository};
 use clap::Subcommand;
-use log::{debug, info};
+use log::{debug, info, warn};
 use nenechi_image::{is_image_file, ImageDetails};
 use nenechi_pixiv::{fetch_tags, IllustrationId};
 use std::thread::sleep;
@@ -66,20 +66,25 @@ fn index(
 
     for file in walker {
         let file = file?;
+        let path = file.path();
         if !file.file_type().is_file() || !is_image_file(file.path()) {
-            debug!("file is not an image, skipping: {}", file.path().display());
+            debug!("file is not an image, skipping: {}", path.display());
             continue
         }
 
-        index_file(file, wallpapers_repository)?
+        let index_result = index_file(&file, wallpapers_repository);
+        if let Err(e) = index_result {
+            warn!("wallpaper index failed for {}: {}", path.display(), e)
+        }
     }
 
+    info!("finish wallpapers index for directory: {}", directory.display());
     Ok(())
 }
 
 /// index the file if it is not indexed
 fn index_file(
-    file: DirEntry,
+    file: &DirEntry,
     wallpapers_repository: &mut WallpaperRepository
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = file.path();
@@ -130,7 +135,7 @@ fn resolve_image_tags(path: &Path) -> Vec<String> {
     let tags = match fetch_tags(&illustration_id) {
         Ok(tags) => tags,
         Err(e) => {
-            debug!("failed fetching Pixiv tags for path {}: {}", path.display(), e);
+            warn!("failed fetching Pixiv tags for path {}: {}", path.display(), e);
             return vec![]
         }
     };
