@@ -8,6 +8,7 @@ use nenechi_image::{is_image_file, ImageDetails};
 use nenechi_pixiv::{fetch_tags, IllustrationId};
 use std::thread::sleep;
 use std::time::Duration;
+use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
 use uuid::{NoContext, Timestamp, Uuid};
 use walkdir::{DirEntry, WalkDir};
@@ -22,18 +23,18 @@ pub enum WallpapersCommands {
 pub fn execute_wallpaper_command(
     command: WallpapersCommands,
     config: WallpapersConfig,
-    db_connection: &mut SqliteConnection
+    connection_pool: Pool<ConnectionManager<SqliteConnection>>
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ignore_patterns = config.ignore.clone();
     let directory = config.directory()?;
-    let mut wallpapers_repository = WallpaperRepository::new(db_connection);
+    let wallpapers_repository = WallpaperRepository::new(connection_pool);
 
     match command {
         WallpapersCommands::Tidy => tidy_command(directory),
         WallpapersCommands::Index => index(
             ignore_patterns,
             directory,
-            &mut wallpapers_repository
+            &wallpapers_repository
         ),
         WallpapersCommands::CleanIndex => Err("Not implemented".into())
     }
@@ -58,7 +59,7 @@ fn tidy_command(directory: &Path) -> Result<(), Box<dyn std::error::Error>> {
 fn index(
     ignore_patterns: Vec<String>,
     directory: &Path,
-    wallpapers_repository: &mut WallpaperRepository
+    wallpapers_repository: &WallpaperRepository
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("indexing wallpapers for directory: {}", directory.display());
 
@@ -85,7 +86,7 @@ fn index(
 /// index the file if it is not indexed
 fn index_file(
     file: &DirEntry,
-    wallpapers_repository: &mut WallpaperRepository
+    wallpapers_repository: &WallpaperRepository
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = file.path();
     let path_string = path.to_str()

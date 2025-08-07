@@ -33,11 +33,11 @@ fn main() {
     let config = CliConfig::read(args.config_file.as_str());
     config.configure();
 
-    let mut db_connection = create_db_connection(&config.database);
+    let connection_pool = create_db_connection(&config.database);
 
     execute_command(
         args.command,
-        &config,
-        &mut db_connection
+        config,
+        connection_pool
     ).unwrap();
 }

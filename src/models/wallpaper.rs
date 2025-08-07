@@ -1,5 +1,6 @@
 use crate::schema::wallpapers;
 use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
 use nenechi_image::AspectRatio;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -64,19 +65,20 @@ impl TryFrom<WallpaperTable> for Wallpaper {
     }
 }
 
-pub struct WallpaperRepository<'a> {
-    connection: &'a mut SqliteConnection,
+pub struct WallpaperRepository {
+    connection_pool: Pool<ConnectionManager<SqliteConnection>>,
 }
 
-impl<'a> WallpaperRepository<'a> {
-    pub fn new(connection: &'a mut SqliteConnection) -> Self {
-        Self { connection }
+impl WallpaperRepository {
+    pub fn new(connection_pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
+        Self { connection_pool }
     }
 
-    pub fn find_by_id(&mut self, id: &str) -> Result<Option<Wallpaper>, Box<dyn std::error::Error>> {
+    pub fn find_by_id(&self, id: &str) -> Result<Option<Wallpaper>, Box<dyn std::error::Error>> {
+        let mut connection = self.connection_pool.get()?;
         let result: Option<WallpaperTable> = wallpapers::table
             .find(id)
-            .first(self.connection)
+            .first(&mut connection)
             .optional()?;
 
         match result {
@@ -85,10 +87,11 @@ impl<'a> WallpaperRepository<'a> {
         }
     }
 
-    pub fn find_by_path(&mut self, path: &str) -> Result<Option<Wallpaper>, Box<dyn std::error::Error>> {
+    pub fn find_by_path(&self, path: &str) -> Result<Option<Wallpaper>, Box<dyn std::error::Error>> {
+        let mut connection = self.connection_pool.get()?;
         let result: Option<WallpaperTable> = wallpapers::table
             .filter(wallpapers::path.eq(path))
-            .first(self.connection)
+            .first(&mut connection)
             .optional()?;
 
         match result {
@@ -97,7 +100,7 @@ impl<'a> WallpaperRepository<'a> {
         }
     }
 
-    pub fn save(&mut self, wallpaper: &Wallpaper) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save(&self, wallpaper: &Wallpaper) -> Result<(), Box<dyn std::error::Error>> {
         let table_model: WallpaperTable = wallpaper.clone().try_into()?;
         let existing = self.find_by_id(&wallpaper.id)?;
 
@@ -110,14 +113,16 @@ impl<'a> WallpaperRepository<'a> {
         Ok(())
     }
 
-    fn insert(&mut self, table_model: &WallpaperTable) -> Result<(), Box<dyn std::error::Error>> {
+    fn insert(&self, table_model: &WallpaperTable) -> Result<(), Box<dyn std::error::Error>> {
+        let mut connection = self.connection_pool.get()?;
         diesel::insert_into(wallpapers::table)
             .values(table_model)
-            .execute(self.connection)?;
+            .execute(&mut connection)?;
         Ok(())
     }
 
-    fn update(&mut self, table_model: &WallpaperTable) -> Result<(), Box<dyn std::error::Error>> {
+    fn update(&self, table_model: &WallpaperTable) -> Result<(), Box<dyn std::error::Error>> {
+        let mut connection = self.connection_pool.get()?;
         diesel::update(wallpapers::table)
             .filter(wallpapers::id.eq(&table_model.id))
             .set((
@@ -127,7 +132,7 @@ impl<'a> WallpaperRepository<'a> {
                 wallpapers::path.eq(&table_model.path),
                 wallpapers::file_name.eq(&table_model.file_name),
             ))
-            .execute(self.connection)?;
+            .execute(&mut connection)?;
         Ok(())
     }
 }
@@ -138,6 +143,7 @@ mod tests {
     use crate::models::{Wallpaper, WallpaperRepository, WallpaperTable};
     use crate::schema::wallpapers;
     use diesel::{OptionalExtension, QueryDsl, RunQueryDsl};
+    use serial_test::serial;
     use nenechi_image::AspectRatio;
     use uuid::Uuid;
 
@@ -155,16 +161,18 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn wallpaper_repository_save_should_insert_new_wallpaper() {
-        let mut db_connection = test_db_connection();
-        let mut repository = WallpaperRepository::new(&mut db_connection);
+        let connection_pool = test_db_connection();
+        let mut connection = connection_pool.get().unwrap();
+        let repository = WallpaperRepository::new(connection_pool);
         let wallpaper = Wallpaper::test();
 
         repository.save(&wallpaper).unwrap();
 
         let result: Option<WallpaperTable> = wallpapers::table
             .find(&wallpaper.id)
-            .first(&mut db_connection)
+            .first(&mut connection)
             .optional()
             .unwrap();
         let existing = result.unwrap()
@@ -175,9 +183,11 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn wallpaper_repository_save_should_update_existing_wallpaper() {
-        let mut db_connection = test_db_connection();
-        let mut repository = WallpaperRepository::new(&mut db_connection);
+        let connection_pool = test_db_connection();
+        let mut connection = connection_pool.get().unwrap();
+        let repository = WallpaperRepository::new(connection_pool);
         let mut wallpaper = Wallpaper::test();
 
         repository.insert(
@@ -193,7 +203,7 @@ mod tests {
 
         let result: Option<WallpaperTable> = wallpapers::table
             .find(&wallpaper.id)
-            .first(&mut db_connection)
+            .first(&mut connection)
             .optional()
             .unwrap();
         let existing = result.unwrap()
@@ -204,9 +214,10 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn wallpaper_repository_find_by_id_should_find_existing() {
-        let mut db_connection = test_db_connection();
-        let mut repository = WallpaperRepository::new(&mut db_connection);
+        let connection_pool = test_db_connection();
+        let repository = WallpaperRepository::new(connection_pool);
         let wallpaper = Wallpaper::test();
 
         repository.save(&wallpaper).unwrap();
@@ -216,9 +227,10 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn wallpaper_repository_find_by_id_should_not_find_not_existing() {
-        let mut db_connection = test_db_connection();
-        let mut repository = WallpaperRepository::new(&mut db_connection);
+        let connection_pool = test_db_connection();
+        let repository = WallpaperRepository::new(connection_pool);
 
         let existing = repository.find_by_id("not_exists").unwrap();
 
@@ -226,9 +238,10 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn wallpaper_repository_find_by_path_should_find_existing() {
-        let mut db_connection = test_db_connection();
-        let mut repository = WallpaperRepository::new(&mut db_connection);
+        let connection_pool = test_db_connection();
+        let repository = WallpaperRepository::new(connection_pool);
         let wallpaper = Wallpaper::test();
 
         repository.save(&wallpaper).unwrap();
@@ -238,9 +251,10 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn wallpaper_repository_find_by_path_should_not_find_not_existing() {
-        let mut db_connection = test_db_connection();
-        let mut repository = WallpaperRepository::new(&mut db_connection);
+        let connection_pool = test_db_connection();
+        let repository = WallpaperRepository::new(connection_pool);
 
         let existing = repository.find_by_path("path/not/exists").unwrap();
 

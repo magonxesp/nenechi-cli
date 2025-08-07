@@ -34,7 +34,7 @@ pub mod tests {
         /// Create a new database configuration for tests
         pub fn test() -> Self {
             Self {
-                file: ":memory:".to_string()
+                file: "nenechi-cli.test.db".to_string()
             }
         }
 
