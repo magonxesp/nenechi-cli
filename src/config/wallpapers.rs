@@ -59,7 +59,7 @@ impl TidyWallpapersConfig {
 
         let path = Path::new(&self.aspect_ratio_directory);
 
-        if !path.is_dir() {
+        if path.exists() && !path.is_dir() {
             return Err(format!("{} is not a directory", self.aspect_ratio_directory));
         }
 
@@ -73,7 +73,7 @@ impl TidyWallpapersConfig {
 
         let path = Path::new(&self.tags_directory);
 
-        if !path.is_dir() {
+        if path.exists() && !path.is_dir() {
             return Err(format!("{} is not a directory", self.tags_directory));
         }
 

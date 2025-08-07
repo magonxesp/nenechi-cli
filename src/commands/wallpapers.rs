@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use crate::config::{TidyWallpapersConfig, WallpapersConfig};
 use crate::fs::{path_match_any_pattern, symlink_file, unwrap_optional_os_str};
 use crate::models::{Wallpaper, WallpaperRepository};
@@ -7,30 +8,40 @@ use diesel::SqliteConnection;
 use log::{debug, info, warn};
 use nenechi_image::{is_image_file, ImageDetails};
 use nenechi_pixiv::{fetch_tags, IllustrationId};
-use std::fs;
+use std::{fmt, fs};
+use std::error::Error;
 use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
 use uuid::{NoContext, Timestamp, Uuid};
 use walkdir::{DirEntry, WalkDir};
 
-#[derive(Debug, Subcommand)]
+#[derive(Clone, Debug, Subcommand)]
 pub enum WallpapersCommands {
     Tidy,
     Index,
     CleanIndex
 }
 
+impl Display for WallpapersCommands {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            WallpapersCommands::Tidy => write!(f, "tidy"),
+            WallpapersCommands::Index => write!(f, "index"),
+            WallpapersCommands::CleanIndex => write!(f, "clean-index"),
+        }
+    }
+}
+
 pub fn execute_wallpaper_command(
     command: WallpapersCommands,
     config: WallpapersConfig,
     connection_pool: Pool<ConnectionManager<SqliteConnection>>
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), String> {
     let ignore_patterns = config.ignore.clone();
     let directory = config.directory()?;
     let wallpapers_repository = WallpaperRepository::new(connection_pool);
-
-    match command {
+    let result = match command {
         WallpapersCommands::Tidy => tidy(
             config.tidy()?,
             ignore_patterns,
@@ -43,6 +54,11 @@ pub fn execute_wallpaper_command(
             wallpapers_repository
         ),
         WallpapersCommands::CleanIndex => Err("Not implemented".into())
+    };
+
+    match result {
+        Ok(_) => Ok(()),
+        Err(err) => Err(format!("subcommand {} failed: {}", command.to_string(), err))
     }
 }
 
@@ -51,7 +67,7 @@ fn tidy(
     ignore_patterns: Vec<String>,
     directory: &Path,
     repository: WallpaperRepository
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn Error>> {
     info!("tidying wallpapers for directory: {}", directory.display());
 
     let walker = walk_directory(ignore_patterns, directory)?;
@@ -82,7 +98,7 @@ fn create_wallpaper_symlinks(
     config: &TidyWallpapersConfig,
     original: &Path,
     wallpaper: &Wallpaper
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn Error>> {
     create_wallpaper_aspect_ratio_symlinks(config, original, wallpaper)?;
     create_wallpaper_tags_symlinks(config, original, wallpaper)?;
 
@@ -93,7 +109,7 @@ fn create_wallpaper_aspect_ratio_symlinks(
     config: &TidyWallpapersConfig,
     original: &Path,
     wallpaper: &Wallpaper
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn Error>> {
     let aspect_ratio_directory = config.aspect_ratio_directory()?;
     let aspect_ratio_directory = aspect_ratio_directory.join(wallpaper.aspect_ratio.to_string());
 
@@ -111,10 +127,15 @@ fn create_wallpaper_tags_symlinks(
     config: &TidyWallpapersConfig,
     original: &Path,
     wallpaper: &Wallpaper
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn Error>> {
     let tags_directory = config.tags_directory()?;
 
     for tag in &wallpaper.tags {
+        let tag = tag.trim();
+        if tag.is_empty() {
+            continue;
+        }
+
         let tag_directory = tags_directory.join(tag);
 
         if !tag_directory.exists() {
@@ -130,7 +151,7 @@ fn create_wallpaper_tags_symlinks(
     Ok(())
 }
 
-fn find_indexed_or_index(file: &DirEntry, repository: &WallpaperRepository) -> Result<Wallpaper, Box<dyn std::error::Error>> {
+fn find_indexed_or_index(file: &DirEntry, repository: &WallpaperRepository) -> Result<Wallpaper, Box<dyn Error>> {
     let path = file.path();
     let path_string = path.to_str()
         .ok_or(format!("unable to cast to string path {}", path.display()))?
@@ -156,7 +177,7 @@ fn index(
     ignore_patterns: Vec<String>,
     directory: &Path,
     wallpapers_repository: WallpaperRepository
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn Error>> {
     info!("indexing wallpapers for directory: {}", directory.display());
 
     let walker = walk_directory(ignore_patterns, directory)?;
@@ -183,7 +204,7 @@ fn index(
 fn index_file(
     file: &DirEntry,
     wallpapers_repository: &WallpaperRepository
-) -> Result<Wallpaper, Box<dyn std::error::Error>> {
+) -> Result<Wallpaper, Box<dyn Error>> {
     let path = file.path();
     let path_string = path.to_str()
         .ok_or(format!("unable to cast to string path {}", path.display()))?
@@ -216,32 +237,30 @@ fn index_file(
 }
 
 fn resolve_image_tags(path: &Path) -> Vec<String> {
-    let illustration_id = match IllustrationId::from_path(path) {
-        Ok(id) => id,
-        Err(e) => {
-            debug!("error resolving Pixiv illustration id for path {}: {}; ", path.display(), e);
-            return vec![]
-        }
-    };
+    let illustration_id = IllustrationId::from_path(path);
+    if let Err(e) = illustration_id {
+        debug!("error resolving Pixiv illustration id for path {}: {}; ", path.display(), e);
+        return vec![]
+    }
 
-    let tags = match fetch_tags(&illustration_id) {
-        Ok(tags) => tags,
-        Err(e) => {
-            warn!("failed fetching Pixiv tags for path {}: {}", path.display(), e);
-            return vec![]
-        }
-    };
+    let tags = fetch_tags(&illustration_id.unwrap());
+    if let Err(e) = tags {
+        warn!("failed fetching Pixiv tags for path {}: {}", path.display(), e);
+        return vec![]
+    }
 
     sleep(Duration::from_millis(300));
-    tags.iter()
-        .map(|tag| tag.translation.en.clone())
+    tags.unwrap()
+        .iter()
+        .map(|tag| tag.translation.en.clone().trim().to_string())
+        .filter(|tag| !tag.is_empty())
         .collect()
 }
 
 fn walk_directory(
     ignore_patterns: Vec<String>,
     directory: &Path
-) -> Result<impl Iterator<Item = Result<DirEntry, walkdir::Error>> + use<>, Box<dyn std::error::Error>> {
+) -> Result<impl Iterator<Item = Result<DirEntry, walkdir::Error>> + use<>, Box<dyn Error>> {
     debug!("walking directory: {}", directory.display());
 
     let entry_filter = move |entry: &DirEntry| {

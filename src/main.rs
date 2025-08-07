@@ -34,9 +34,14 @@ fn main() {
 
     let connection_pool = create_db_connection(&config.database);
 
-    execute_command(
+    let result = execute_command(
         args.command,
         config,
         connection_pool
-    ).unwrap();
+    );
+
+    if let Err(err) = result {
+        println!("{}", err);
+        std::process::exit(1);
+    }
 }
