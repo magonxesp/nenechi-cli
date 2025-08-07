@@ -91,6 +91,7 @@ fn tidy(
         create_wallpaper_symlinks(&config, path, &wallpaper.unwrap())?
     }
 
+    info!("finish tidying wallpapers for directory: {}", directory.display());
     Ok(())
 }
 

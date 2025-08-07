@@ -8,3 +8,4 @@ config.*.yml
 sqlite
 docker-compose.yml
 docker-compose.*.yml
+.version
