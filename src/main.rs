@@ -10,7 +10,6 @@ use clap::Parser;
 use commands::execute_command;
 use commands::Commands;
 use config::CliConfig;
-use diesel::SqliteConnection;
 
 #[derive(Debug, Parser)]
 #[command(name = "nennechi-cli")]

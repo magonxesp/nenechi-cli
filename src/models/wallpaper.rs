@@ -13,17 +13,7 @@ pub struct Wallpaper {
     pub file_name: String,
 }
 
-impl Wallpaper {
-    fn update_from_other(&mut self, model: &Wallpaper) {
-        self.pixiv_illustration_id = model.pixiv_illustration_id.clone();
-        self.tags = model.tags.clone();
-        self.aspect_ratio = model.aspect_ratio.clone();
-        self.path = model.path.clone();
-        self.file_name = model.file_name.clone();
-    }
-}
-
-#[derive(Queryable, Selectable, Insertable)]
+#[derive(Clone, Queryable, Selectable, Insertable)]
 #[diesel(table_name = crate::schema::wallpapers)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct WallpaperTable {
@@ -143,8 +133,8 @@ mod tests {
     use crate::models::{Wallpaper, WallpaperRepository, WallpaperTable};
     use crate::schema::wallpapers;
     use diesel::{OptionalExtension, QueryDsl, RunQueryDsl};
-    use serial_test::serial;
     use nenechi_image::AspectRatio;
+    use serial_test::serial;
     use uuid::Uuid;
 
     impl Wallpaper {

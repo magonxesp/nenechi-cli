@@ -36,9 +36,9 @@ impl WallpapersConfig {
         Ok(path)
     }
 
-    pub fn tidy(&self) -> Result<&TidyWallpapersConfig, String> {
+    pub fn tidy(&self) -> Result<TidyWallpapersConfig, String> {
         self.tidy
-            .as_ref()
+            .clone()
             .ok_or("wallpapers.tidy configuration is required".into())
     }
 }

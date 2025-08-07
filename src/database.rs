@@ -1,6 +1,6 @@
 use crate::config::DatabaseConfig;
 use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::{Connection, SqliteConnection};
+use diesel::SqliteConnection;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");

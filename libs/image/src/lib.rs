@@ -4,4 +4,4 @@ mod utils;
 
 pub use image::*;
 pub use aspect_ratio::*;
-pub use utils::*;
+pub use utils::is_image_file;

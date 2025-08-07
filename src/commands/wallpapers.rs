@@ -1,15 +1,16 @@
-use std::path::Path;
-use crate::config::WallpapersConfig;
-use crate::fs::path_match_any_pattern;
+use crate::config::{TidyWallpapersConfig, WallpapersConfig};
+use crate::fs::{path_match_any_pattern, symlink_file, unwrap_optional_os_str};
 use crate::models::{Wallpaper, WallpaperRepository};
 use clap::Subcommand;
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::SqliteConnection;
 use log::{debug, info, warn};
 use nenechi_image::{is_image_file, ImageDetails};
 use nenechi_pixiv::{fetch_tags, IllustrationId};
+use std::fs;
+use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::SqliteConnection;
 use uuid::{NoContext, Timestamp, Uuid};
 use walkdir::{DirEntry, WalkDir};
 
@@ -30,36 +31,131 @@ pub fn execute_wallpaper_command(
     let wallpapers_repository = WallpaperRepository::new(connection_pool);
 
     match command {
-        WallpapersCommands::Tidy => tidy_command(directory),
+        WallpapersCommands::Tidy => tidy(
+            config.tidy()?,
+            ignore_patterns,
+            directory,
+            wallpapers_repository
+        ),
         WallpapersCommands::Index => index(
             ignore_patterns,
             directory,
-            &wallpapers_repository
+            wallpapers_repository
         ),
         WallpapersCommands::CleanIndex => Err("Not implemented".into())
     }
 }
 
-fn tidy_command(directory: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn tidy(
+    config: TidyWallpapersConfig,
+    ignore_patterns: Vec<String>,
+    directory: &Path,
+    repository: WallpaperRepository
+) -> Result<(), Box<dyn std::error::Error>> {
     info!("tidying wallpapers for directory: {}", directory.display());
 
-    for entry in WalkDir::new(directory) {
-        let entry = entry?;
-        let path = entry.path();
-        let metadata = entry.metadata()?;
+    let walker = walk_directory(ignore_patterns, directory)?;
 
-        if metadata.is_file() && !metadata.is_symlink() {
-            info!("Archivo: {}", path.display());
+    for file in walker {
+        let file = file?;
+        let path = file.path();
+
+        if !file.file_type().is_file() || !is_image_file(file.path()) {
+            debug!("file is not an image, skipping: {}", path.display());
+            continue
         }
+
+        let wallpaper = find_indexed_or_index(&file, &repository);
+
+        if let Err(e) = wallpaper {
+            warn!("failed retrieving indexed wallpaper {}: {}", path.display(), e);
+            continue
+        }
+
+        create_wallpaper_symlinks(&config, path, &wallpaper.unwrap())?
     }
 
     Ok(())
 }
 
+fn create_wallpaper_symlinks(
+    config: &TidyWallpapersConfig,
+    original: &Path,
+    wallpaper: &Wallpaper
+) -> Result<(), Box<dyn std::error::Error>> {
+    create_wallpaper_aspect_ratio_symlinks(config, original, wallpaper)?;
+    create_wallpaper_tags_symlinks(config, original, wallpaper)?;
+
+    Ok(())
+}
+
+fn create_wallpaper_aspect_ratio_symlinks(
+    config: &TidyWallpapersConfig,
+    original: &Path,
+    wallpaper: &Wallpaper
+) -> Result<(), Box<dyn std::error::Error>> {
+    let aspect_ratio_directory = config.aspect_ratio_directory()?;
+    let aspect_ratio_directory = aspect_ratio_directory.join(wallpaper.aspect_ratio.to_string());
+
+    if !aspect_ratio_directory.exists() {
+        fs::create_dir_all(&aspect_ratio_directory)?;
+    }
+
+    let original_file_name = unwrap_optional_os_str(original.file_name())?;
+    let destination_symlink = &aspect_ratio_directory.join(&original_file_name);
+    let destination_symlink = Path::new(destination_symlink);
+    symlink_file(original, destination_symlink)
+}
+
+fn create_wallpaper_tags_symlinks(
+    config: &TidyWallpapersConfig,
+    original: &Path,
+    wallpaper: &Wallpaper
+) -> Result<(), Box<dyn std::error::Error>> {
+    let tags_directory = config.tags_directory()?;
+
+    for tag in &wallpaper.tags {
+        let tag_directory = tags_directory.join(tag);
+
+        if !tag_directory.exists() {
+            fs::create_dir_all(&tag_directory)?;
+        }
+
+        let original_file_name = unwrap_optional_os_str(original.file_name())?;
+        let destination_symlink = &tag_directory.join(&original_file_name);
+        let destination_symlink = Path::new(destination_symlink);
+        symlink_file(original, destination_symlink)?
+    }
+
+    Ok(())
+}
+
+fn find_indexed_or_index(file: &DirEntry, repository: &WallpaperRepository) -> Result<Wallpaper, Box<dyn std::error::Error>> {
+    let path = file.path();
+    let path_string = path.to_str()
+        .ok_or(format!("unable to cast to string path {}", path.display()))?
+        .to_string();
+
+    let existing = repository.find_by_path(&path_string)?;
+
+    if existing.is_none() {
+        info!("wallpaper is not indexed, trying to index: {}", path.display());
+        let indexed = index_file(file, repository);
+        if let Err(e) = indexed {
+            warn!("wallpaper index failed for {}: {}", path.display(), e);
+            return Err(e);
+        }
+
+        return Ok(indexed?);
+    }
+
+    Ok(existing.unwrap())
+}
+
 fn index(
     ignore_patterns: Vec<String>,
     directory: &Path,
-    wallpapers_repository: &WallpaperRepository
+    wallpapers_repository: WallpaperRepository
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("indexing wallpapers for directory: {}", directory.display());
 
@@ -73,7 +169,7 @@ fn index(
             continue
         }
 
-        let index_result = index_file(&file, wallpapers_repository);
+        let index_result = index_file(&file, &wallpapers_repository);
         if let Err(e) = index_result {
             warn!("wallpaper index failed for {}: {}", path.display(), e)
         }
@@ -87,7 +183,7 @@ fn index(
 fn index_file(
     file: &DirEntry,
     wallpapers_repository: &WallpaperRepository
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<Wallpaper, Box<dyn std::error::Error>> {
     let path = file.path();
     let path_string = path.to_str()
         .ok_or(format!("unable to cast to string path {}", path.display()))?
@@ -96,19 +192,14 @@ fn index_file(
 
     let existing = wallpapers_repository.find_by_path(&path_string)?;
     if existing.is_some() {
-        debug!("wallpaper already indexed: {}", &path_string);
-        return Ok(());
+        return Err("wallpaper already indexed".into());
     }
 
     let id = Uuid::new_v7(Timestamp::now(NoContext)).to_string();
     let illustration_id = IllustrationId::from_path(path).ok();
     let tags = resolve_image_tags(path);
     let image_details = ImageDetails::read_from_path(path)?;
-    let file_name = path.file_name()
-        .ok_or(format!("unable to get file name for {}", path.display()))?
-        .to_str()
-        .ok_or(format!("unable to cast file name to string for {}", path.display()))?
-        .to_string();
+    let file_name = unwrap_optional_os_str(path.file_name())?;
 
     let wallpaper = Wallpaper {
         id,
@@ -121,7 +212,7 @@ fn index_file(
 
     wallpapers_repository.save(&wallpaper)?;
     debug!("wallpaper indexed: {}", &wallpaper.path);
-    Ok(())
+    Ok(wallpaper)
 }
 
 fn resolve_image_tags(path: &Path) -> Vec<String> {

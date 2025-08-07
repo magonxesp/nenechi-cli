@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::{client::create_http_client, IllustrationId};
+use crate::IllustrationId;
 use crate::http::http_get_json;
 use crate::response::verify_response_is_not_error;
 
