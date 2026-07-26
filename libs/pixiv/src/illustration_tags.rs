@@ -1,8 +1,8 @@
-use serde::Deserialize;
-use log::debug;
-use crate::id::IllustrationId;
 use crate::http::http_get_json;
+use crate::id::IllustrationId;
 use crate::response::verify_response_is_not_error;
+use log::debug;
+use serde::Deserialize;
 
 #[derive(Deserialize, Default, Debug)]
 pub struct TagTranslation {

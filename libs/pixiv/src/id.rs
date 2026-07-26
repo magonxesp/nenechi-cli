@@ -1,5 +1,5 @@
-use std::path::Path;
 use regex::Regex;
+use std::path::Path;
 
 #[derive(Clone)]
 pub struct IllustrationId {

@@ -1,6 +1,6 @@
-use std::path::Path;
-use image::DynamicImage;
 use crate::AspectRatio;
+use image::DynamicImage;
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct ImageDetails {

@@ -1,4 +1,4 @@
-use nenechi_pixiv::{fetch_tags, IllustrationId};
+use nenechi_pixiv::{IllustrationId, fetch_tags};
 
 #[test]
 fn it_should_fetch_tags_by_id() {

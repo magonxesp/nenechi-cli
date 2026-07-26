@@ -1,4 +1,4 @@
-use nenechi_pixiv::{fetch_image_urls, IllustrationId};
+use nenechi_pixiv::{IllustrationId, fetch_image_urls};
 
 #[test]
 fn it_should_fetch_image_urls_by_id() {

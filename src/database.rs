@@ -1,7 +1,7 @@
 use crate::config::DatabaseConfig;
-use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
 
@@ -23,8 +23,8 @@ pub fn create_db_connection(config: &DatabaseConfig) -> Pool<ConnectionManager<S
 pub mod tests {
     use crate::config::DatabaseConfig;
     use crate::database::create_db_connection;
-    use diesel::r2d2::{ConnectionManager, Pool};
     use diesel::SqliteConnection;
+    use diesel::r2d2::{ConnectionManager, Pool};
 
     pub fn test_db_connection() -> Pool<ConnectionManager<SqliteConnection>> {
         let config = DatabaseConfig::test();

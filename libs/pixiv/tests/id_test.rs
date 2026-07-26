@@ -1,5 +1,5 @@
-use std::path::Path;
 use nenechi_pixiv::IllustrationId;
+use std::path::Path;
 
 #[test]
 fn it_should_create_valid_illustration_id() {

@@ -1,8 +1,8 @@
+use glob::Pattern;
+use log::{debug, warn};
 use std::error::Error;
 use std::ffi::OsStr;
 use std::path::Path;
-use glob::Pattern;
-use log::{debug, warn};
 
 pub fn path_match_any_pattern(path: &Path, patterns: &[String]) -> bool {
     let mut valid_patterns = vec![];
@@ -57,8 +57,8 @@ pub fn symlink_file(original: &Path, link: &Path) -> Result<(), Box<dyn Error>> 
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
     use super::*;
+    use std::path::Path;
 
     #[test]
     fn path_match_any_pattern_returns_true_for_matching_path() {

@@ -1,5 +1,5 @@
-use log::debug;
 use crate::client::create_http_client;
+use log::debug;
 
 pub fn http_get_json(url: &str) -> Result<String, String> {
     let client = create_http_client();

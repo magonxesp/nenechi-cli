@@ -1,8 +1,8 @@
 use crate::config::resolve_configs_dir;
 use log::warn;
+use serde::Deserialize;
 use std::fs;
 use std::path::Path;
-use serde::Deserialize;
 
 const CONFIG_FILE_NAME: &str = "wallpapers.yaml";
 

@@ -1,18 +1,18 @@
-use std::fmt::{Display, Formatter};
 use crate::config::{TidyWallpapersConfig, WallpapersConfig};
 use crate::fs::{path_match_any_pattern, symlink_file, unwrap_optional_os_str};
 use crate::wallpapers::{Wallpaper, WallpaperRepository};
 use clap::Subcommand;
-use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
+use diesel::r2d2::{ConnectionManager, Pool};
 use log::{debug, info, warn};
-use nenechi_image::{is_image_file, ImageDetails};
-use nenechi_pixiv::{fetch_tags, IllustrationId};
-use std::{fmt, fs};
+use nenechi_image::{ImageDetails, is_image_file};
+use nenechi_pixiv::{IllustrationId, fetch_tags};
 use std::error::Error;
+use std::fmt::{Display, Formatter};
 use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
+use std::{fmt, fs};
 use uuid::{NoContext, Timestamp, Uuid};
 use walkdir::{DirEntry, WalkDir};
 

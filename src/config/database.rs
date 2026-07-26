@@ -26,9 +26,9 @@ impl DatabaseConfig {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::config::DatabaseConfig;
     use std::fs;
     use std::path::Path;
-    use crate::config::DatabaseConfig;
 
     impl DatabaseConfig {
         /// Create a new database configuration for tests

@@ -1,5 +1,5 @@
-use std::path::Path;
 use nenechi_image::{AspectRatio, ImageDetails};
+use std::path::Path;
 
 #[test]
 fn it_should_read_image_metadata() {
