@@ -130,7 +130,7 @@ impl WallpaperRepository {
 #[cfg(test)]
 mod tests {
     use crate::database::tests::test_db_connection;
-    use crate::models::{Wallpaper, WallpaperRepository, WallpaperTable};
+    use super::*;
     use crate::schema::wallpapers;
     use diesel::{OptionalExtension, QueryDsl, RunQueryDsl};
     use nenechi_image::AspectRatio;

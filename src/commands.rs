@@ -1,14 +1,12 @@
-mod wallpapers;
-
+use crate::config::CliConfig;
+use crate::wallpapers::command::WallpapersCommands;
+use crate::wallpapers::command::execute_wallpaper_command;
+use clap::Subcommand;
+use diesel::SqliteConnection;
+use diesel::r2d2::{ConnectionManager, Pool};
+use log::warn;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
-use crate::commands::wallpapers::execute_wallpaper_command;
-use crate::config::CliConfig;
-use clap::Subcommand;
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::SqliteConnection;
-use log::warn;
-use wallpapers::WallpapersCommands;
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum Commands {

@@ -1,14 +1,13 @@
 mod config;
 mod commands;
-mod models;
 mod schema;
 mod fs;
 mod database;
+mod wallpapers;
 
 use crate::database::create_db_connection;
 use clap::Parser;
-use commands::execute_command;
-use commands::Commands;
+use commands::{Commands, execute_command};
 use config::CliConfig;
 
 #[derive(Debug, Parser)]

@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use crate::config::{TidyWallpapersConfig, WallpapersConfig};
 use crate::fs::{path_match_any_pattern, symlink_file, unwrap_optional_os_str};
-use crate::models::{Wallpaper, WallpaperRepository};
+use crate::wallpapers::{Wallpaper, WallpaperRepository};
 use clap::Subcommand;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::SqliteConnection;
