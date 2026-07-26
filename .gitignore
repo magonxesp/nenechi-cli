@@ -2,7 +2,7 @@
 *.log
 config.yml
 config.*.yml
-!config.example.yml
+!examples/config.yaml
 *.db
 .idea
 sqlite

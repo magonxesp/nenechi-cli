@@ -1,5 +1,15 @@
+use crate::config::resolve_configs_dir;
+use log::warn;
+use std::fs;
 use std::path::Path;
 use serde::Deserialize;
+
+const CONFIG_FILE_NAME: &str = "wallpapers.yaml";
+
+#[derive(Debug, Deserialize)]
+struct WallpapersConfigFile {
+    wallpapers: WallpapersConfig,
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct WallpapersConfig {
@@ -22,6 +32,41 @@ impl Default for WallpapersConfig {
 }
 
 impl WallpapersConfig {
+    pub fn read() -> Result<Self, String> {
+        let configs_directory = resolve_configs_dir().ok_or_else(|| {
+            let message = "unable to read wallpapers configuration because the configuration directory does not exist";
+            warn!("{}", message);
+            message.to_string()
+        })?;
+        let path = configs_directory.join(CONFIG_FILE_NAME);
+
+        if !path.is_file() {
+            let message = format!(
+                "unable to read wallpapers configuration because {} does not exist",
+                path.display()
+            );
+            warn!("{}", message);
+            return Err(message);
+        }
+
+        let content = fs::read_to_string(&path).map_err(|error| {
+            format!(
+                "failed reading wallpapers configuration {}: {}",
+                path.display(),
+                error
+            )
+        })?;
+        let config: WallpapersConfigFile = serde_yaml::from_str(&content).map_err(|error| {
+            format!(
+                "invalid wallpapers configuration {}: {}",
+                path.display(),
+                error
+            )
+        })?;
+
+        Ok(config.wallpapers)
+    }
+
     pub fn directory(&self) -> Result<&Path, String> {
         if self.directory.is_empty() {
             return Err("wallpapers.directory is required".into());

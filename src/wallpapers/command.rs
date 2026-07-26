@@ -35,9 +35,9 @@ impl Display for WallpapersCommands {
 
 pub fn execute_wallpaper_command(
     command: WallpapersCommands,
-    config: WallpapersConfig,
     connection_pool: Pool<ConnectionManager<SqliteConnection>>
 ) -> Result<(), String> {
+    let config = WallpapersConfig::read()?;
     let ignore_patterns = config.ignore.clone();
     let directory = config.directory()?;
     let wallpapers_repository = WallpaperRepository::new(connection_pool);
@@ -284,5 +284,4 @@ fn walk_directory(
 
     Ok(walker)
 }
-
 

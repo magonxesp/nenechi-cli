@@ -1,4 +1,3 @@
-use crate::config::CliConfig;
 use crate::wallpapers::command::WallpapersCommands;
 use crate::wallpapers::command::execute_wallpaper_command;
 use clap::Subcommand;
@@ -26,13 +25,11 @@ impl Display for Commands {
 
 pub fn execute_command(
     command: Commands,
-    config: CliConfig,
     connection_pool: Pool<ConnectionManager<SqliteConnection>>
 ) -> Result<(), String> {
     let result = match command.clone() {
         Commands::Wallpapers { command: subcommand } => execute_wallpaper_command(
             subcommand,
-            config.wallpapers.clone(),
             connection_pool
         ),
     };
