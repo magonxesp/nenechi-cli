@@ -7,7 +7,7 @@ use serde::Deserialize;
 const CONFIG_FILE_NAME: &str = "wallpapers.yaml";
 
 #[derive(Debug, Deserialize)]
-struct WallpapersConfigFile {
+struct WallpapersConfigRoot {
     wallpapers: WallpapersConfig,
 }
 
@@ -56,7 +56,7 @@ impl WallpapersConfig {
                 error
             )
         })?;
-        let config: WallpapersConfigFile = serde_yaml::from_str(&content).map_err(|error| {
+        let config: WallpapersConfigRoot = serde_yaml::from_str(&content).map_err(|error| {
             format!(
                 "invalid wallpapers configuration {}: {}",
                 path.display(),
