@@ -5,6 +5,7 @@ mod fs;
 mod logging;
 mod schema;
 mod wallpapers;
+mod jellyfin;
 
 use crate::database::create_db_connection;
 use clap::Parser;

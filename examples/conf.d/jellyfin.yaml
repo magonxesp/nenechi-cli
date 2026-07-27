@@ -1,0 +1,75 @@
+jellyfin:
+  targets:
+    # Cada subdirectorio de source representa una serie.
+    - name: anime
+      type: series
+      source: /mnt/downloads/anime
+      destination: /mnt/jellyfin/series
+
+      series:
+        # Valores admitidos: anime, live-action y animation.
+        category: anime
+
+        episode:
+          # Cada patron debe contener un grupo de captura llamado "episode".
+          patterns:
+            - '(?i)(?:EP?|Episode)[ ._-]*(?<episode>\d{1,3})'
+            - '[ ._-](?<episode>\d{1,3})[ ._-]'
+
+          # Si algun fichero no coincide, se conserva el orden devuelto por
+          # el sistema de archivos y se numeran todos los episodios.
+          fallback: filesystem_order
+          start_at: 1
+
+      include:
+        - '*.mkv'
+        - '*.mp4'
+        - '*.avi'
+
+    - name: live-action-series
+      type: series
+      source: /mnt/downloads/live-action
+      destination: /mnt/jellyfin/series
+
+      series:
+        category: live-action
+        episode:
+          patterns:
+            - '(?i)S\d{1,2}E(?<episode>\d{1,3})'
+            - '(?i)(?:EP?|Episode)[ ._-]*(?<episode>\d{1,3})'
+          fallback: filesystem_order
+          start_at: 1
+
+      include:
+        - '*.mkv'
+        - '*.mp4'
+        - '*.avi'
+
+    - name: western-animation
+      type: series
+      source: /mnt/downloads/animation
+      destination: /mnt/jellyfin/series
+
+      series:
+        category: animation
+        episode:
+          patterns:
+            - '(?i)S\d{1,2}E(?<episode>\d{1,3})'
+            - '(?i)(?:EP?|Episode)[ ._-]*(?<episode>\d{1,3})'
+          fallback: filesystem_order
+          start_at: 1
+
+      include:
+        - '*.mkv'
+        - '*.mp4'
+        - '*.avi'
+
+    # Cada fichero o subdirectorio inmediato representa una pelicula.
+    - name: movies
+      type: movies
+      source: /mnt/downloads/movies
+      destination: /mnt/jellyfin/movies
+
+      include:
+        - '*.mkv'
+        - '*.mp4'

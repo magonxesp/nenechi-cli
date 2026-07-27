@@ -47,3 +47,19 @@ sudo mkdir -p /etc/nenechi/conf.d
 sudo cp examples/config.yaml /etc/nenechi/config.yaml
 sudo cp examples/conf.d/wallpapers.yaml /etc/nenechi/conf.d/wallpapers.yaml
 ```
+
+## Testing
+
+Las pruebas de integración de MyAnimeList necesitan una API key. Crea un
+fichero `.env` en la raíz del repositorio con este contenido:
+
+```dotenv
+MYANIMELIST_API_KEY=tu_api_key
+```
+
+El fichero `.env` está ignorado por Git y se carga únicamente desde las
+pruebas. Para ejecutar todos los tests:
+
+```bash
+cargo test --workspace
+```

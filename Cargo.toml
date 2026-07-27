@@ -1,7 +1,7 @@
 [workspace]
 members = [
     ".", 
-    "libs/image",
+    "libs/image", "libs/myanimelist",
     "libs/pixiv"
 ]
 
@@ -26,5 +26,9 @@ diesel = { version = "2.2.0", features = ["sqlite", "serde_json", "r2d2"] }
 diesel_migrations = "2.2.0"
 serde_json = "1.0.141"
 glob = "0.3.2"
+regex = "1.11"
 uuid = { version = "1.8.0", features = ["v4", "v7"] }
 serial_test = "3.2.0"
+
+[dev-dependencies]
+tempfile = "3.20"
