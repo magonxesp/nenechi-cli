@@ -16,6 +16,7 @@ edition = "2024"
 [dependencies]
 nenechi-pixiv = { path = "libs/pixiv" }
 nenechi-image = { path = "libs/image" }
+nenechi-myanimelist = { path = "libs/myanimelist" }
 clap = { version = "4.5.41", features = ["derive"] }
 log = "0.4"
 fern = "0.7"

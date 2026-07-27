@@ -1184,6 +1184,7 @@ dependencies = [
  "glob",
  "log",
  "nenechi-image",
+ "nenechi-myanimelist",
  "nenechi-pixiv",
  "regex",
  "serde",
