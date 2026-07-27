@@ -12,3 +12,5 @@ README.md
 sqlite
 docker-compose.yml
 docker-compose.*.yml
+# for testing
+wallpapers

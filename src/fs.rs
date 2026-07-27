@@ -1,8 +1,23 @@
 use glob::Pattern;
 use log::{debug, warn};
+use std::env;
 use std::error::Error;
 use std::ffi::OsStr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+pub fn expand_user_dir(path: impl AsRef<Path>) -> PathBuf {
+    let path = path.as_ref();
+
+    let Some(relative_path) = path.strip_prefix("~").ok() else {
+        return path.to_path_buf();
+    };
+
+    let Some(home_dir) = env::var_os("HOME") else {
+        return path.to_path_buf();
+    };
+
+    PathBuf::from(home_dir).join(relative_path)
+}
 
 pub fn path_match_any_pattern(path: &Path, patterns: &[String]) -> bool {
     let mut valid_patterns = vec![];
@@ -59,6 +74,31 @@ pub fn symlink_file(original: &Path, link: &Path) -> Result<(), Box<dyn Error>> 
 mod tests {
     use super::*;
     use std::path::Path;
+
+    #[test]
+    fn expands_a_leading_user_directory() {
+        let home_dir = PathBuf::from(env::var_os("HOME").expect("HOME must be defined"));
+
+        assert_eq!(
+            expand_user_dir("~/wallpapers/image.png"),
+            home_dir.join("wallpapers/image.png")
+        );
+    }
+
+    #[test]
+    fn expands_user_directory_on_its_own() {
+        let home_dir = PathBuf::from(env::var_os("HOME").expect("HOME must be defined"));
+
+        assert_eq!(expand_user_dir("~"), home_dir);
+    }
+
+    #[test]
+    fn leaves_paths_without_a_leading_user_directory_unchanged() {
+        assert_eq!(
+            expand_user_dir("/var/lib/nenechi"),
+            PathBuf::from("/var/lib/nenechi")
+        );
+    }
 
     #[test]
     fn path_match_any_pattern_returns_true_for_matching_path() {

@@ -2,6 +2,7 @@ mod commands;
 mod config;
 mod database;
 mod fs;
+mod logging;
 mod schema;
 mod wallpapers;
 
@@ -21,7 +22,7 @@ struct Cli {
 fn main() {
     let args = Cli::parse();
     let config = read_config();
-    config.configure();
+    logging::configure(&config.logging).expect("failed to configure logging");
 
     let connection_pool = create_db_connection(&config.database);
 

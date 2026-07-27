@@ -1,4 +1,4 @@
-.PHONY: build-docker-image publish-docker-image
+.PHONY: build-docker-image publish-docker-image deb deb-debug
 
 build-docker-image:
 	echo "$$(date +%Y-%m-%d.%H%M%S)" > .version \
@@ -8,3 +8,13 @@ build-docker-image:
 
 publish-docker-image:
 	docker push "magonx/nenechi-cli:$$(cat .version)"
+
+deb:
+	cargo clean \
+	&& cargo build --release \
+	&& bash scripts/deb-package.sh release
+
+deb-debug:
+	cargo clean \
+	&& cargo build \
+	&& bash scripts/deb-package.sh debug

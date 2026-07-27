@@ -1,24 +1,5 @@
 use log::LevelFilter;
-use log4rs::Config;
-use log4rs::append::console::ConsoleAppender;
-use log4rs::append::file::FileAppender;
-use log4rs::config::{Appender, Root};
-use log4rs::encode::pattern::PatternEncoder;
 use serde::Deserialize;
-
-#[derive(Debug, Deserialize, PartialEq, Clone, Copy)]
-pub enum LoggingOutput {
-    #[serde(rename = "console")]
-    Console,
-    #[serde(rename = "file")]
-    File,
-}
-
-impl Default for LoggingOutput {
-    fn default() -> Self {
-        LoggingOutput::Console
-    }
-}
 
 #[derive(Debug, Deserialize, Clone, Copy)]
 pub enum LoggingLevel {
@@ -41,13 +22,13 @@ impl Default for LoggingLevel {
 }
 
 impl LoggingLevel {
-    pub fn as_log4rs_enum(&self) -> LevelFilter {
+    pub fn as_level_filter(&self) -> LevelFilter {
         match self {
             LoggingLevel::Debug => LevelFilter::Debug,
             LoggingLevel::Info => LevelFilter::Info,
             LoggingLevel::Warn => LevelFilter::Warn,
             LoggingLevel::Error => LevelFilter::Error,
-            LoggingLevel::Trace => LevelFilter::Trace
+            LoggingLevel::Trace => LevelFilter::Trace,
         }
     }
 }
@@ -56,67 +37,20 @@ impl LoggingLevel {
 pub struct LoggingConfig {
     #[serde(default)]
     pub level: LoggingLevel,
-    #[serde(default)]
-    pub output: LoggingOutput,
     #[serde(default = "LoggingConfig::default_file")]
-    pub file: String
+    pub file: String,
 }
 
 impl Default for LoggingConfig {
     fn default() -> Self {
         LoggingConfig {
             level: LoggingLevel::default(),
-            output: LoggingOutput::default(),
-            file: LoggingConfig::default_file()
+            file: LoggingConfig::default_file(),
         }
     }
 }
 
 impl LoggingConfig {
-    pub fn apply_configuration(&self) {
-        let config = match self.output {
-            LoggingOutput::Console => self.configure_console_logger(),
-            LoggingOutput::File => self.configure_file_logger(),
-        };
-
-        log4rs::init_config(config).unwrap();
-    }
-
-    fn configure_console_logger(&self) -> Config {
-        let stdout = ConsoleAppender::builder().build();
-
-        let appender = Appender::builder()
-            .build("stdout", Box::new(stdout));
-
-        let root = Root::builder()
-            .appender("stdout")
-            .build(self.level.as_log4rs_enum());
-
-        Config::builder()
-            .appender(appender)
-            .build(root)
-            .unwrap()
-    }
-
-    fn configure_file_logger(&self) -> Config {
-        let file = FileAppender::builder()
-            .encoder(Box::new(PatternEncoder::new("{d} - {m}{n}")))
-            .build(&self.file)
-            .unwrap();
-
-        let appender = Appender::builder()
-            .build("file", Box::new(file));
-
-        let root = Root::builder()
-            .appender("file")
-            .build(self.level.as_log4rs_enum());
-
-        Config::builder()
-            .appender(appender)
-            .build(root)
-            .unwrap()
-    }
-
     fn default_file() -> String {
         String::from("nenechi-cli.log")
     }

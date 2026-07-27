@@ -4,7 +4,6 @@ wallpapers:
   # Lista de directorios o ficheros a ignorar
   ignore:
     - wallpapers/cats/**/*
-    - wallpapers/*.png
   # Configuracion para ordenar y clasificar los wallpapers
   tidy:
     # Ruta al directorios donde se organizaran por aspect ratio

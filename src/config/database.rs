@@ -1,9 +1,11 @@
+use std::path::{Path, PathBuf};
 use serde::Deserialize;
+use crate::fs::expand_user_dir;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
     #[serde(default = "DatabaseConfig::default_file")]
-    file: String,
+    pub file: String,
 }
 
 impl Default for DatabaseConfig {
@@ -20,7 +22,33 @@ impl DatabaseConfig {
     }
 
     pub fn sqlite_uri(&self) -> String {
-        format!("sqlite://{}", self.file)
+        format!("sqlite://{}", expand_user_dir(&self.file).to_string_lossy())
+    }
+
+    pub fn directory(&self) -> Option<PathBuf> {
+        let path = Path::new(self.file.as_str());
+
+        if let Some(directory) = path.parent() {
+            let directory = directory.to_path_buf();
+            Some(expand_user_dir(directory))
+        } else {
+            None
+        }
+    }
+
+    pub fn filename(&self) -> Option<PathBuf> {
+        let path = Path::new(self.file.as_str());
+        path.file_name().map(|s| s.into())
+    }
+
+    pub fn path(&self) -> Option<PathBuf> {
+        let filename = self.filename()?;
+
+        if let Some(directory) = self.directory() {
+            Some(directory.join(filename))
+        } else {
+            None
+        }
     }
 }
 

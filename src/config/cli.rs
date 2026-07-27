@@ -17,9 +17,3 @@ impl Default for CliConfig {
         }
     }
 }
-
-impl CliConfig {
-    pub fn configure(&self) {
-        self.logging.apply_configuration();
-    }
-}

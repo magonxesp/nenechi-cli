@@ -1,13 +1,9 @@
 logging:
   # Nivel de log: trace, debug, info, warn, error.
-  # También se puede sobreescribir con la variable de entorno RUST_LOG.
   level: info
-  # Lista de salidas activas. Opciones: "console", "file".
-  output: console
-  # Ruta del fichero de logs.
-  # Solo funcionara si el output es "file"
-  file: nenechi-cli.log
+  # Los logs se escriben simultáneamente en la consola y en este fichero.
+  file: /var/log/nenechi.log
 
 database:
   # Ruta del fichero de la base de datos
-  file: nenechi-cli.db
+  file: ~/.local/nenechi/nenechi-cli.db
