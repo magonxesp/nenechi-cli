@@ -70,7 +70,9 @@ nenechi-cli jellyfin mount
 ```
 
 El comando consulta primero el índice de series y añade automáticamente las
-que todavía no estén indexadas.
+que todavía no estén indexadas. Los nombres generados en `destination` se
+normalizan para que sean compatibles con clientes Windows a través de SMB,
+sin modificar los ficheros originales ni los títulos guardados en SQLite.
 
 ## Testing
 

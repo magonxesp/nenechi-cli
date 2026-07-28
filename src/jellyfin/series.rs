@@ -1,9 +1,9 @@
-use crate::fs::symlink_file;
+use crate::fs::{sanitize_filename_component, symlink_file};
 use crate::jellyfin::config::{SeriesCategory, TargetConfig, TargetType};
 use crate::jellyfin::pattern::EpisodePatterns;
 use std::error::Error;
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -58,9 +58,10 @@ pub fn organize(
         let metadata = metadata_resolver.resolve(&series_directory, &series_config.category)?;
         validate_metadata(&metadata)?;
         let episodes = patterns.number_files(&files)?;
+        let safe_title = sanitize_filename_component(&metadata.title);
         let season_directory = target
             .destination
-            .join(&metadata.title)
+            .join(&safe_title)
             .join(format!("Season {:02}", metadata.season));
         fs::create_dir_all(&season_directory)?;
 
@@ -70,10 +71,11 @@ pub fn organize(
                 .extension()
                 .ok_or_else(|| format!("episode file {} has no extension", episode.path.display()))?
                 .to_string_lossy();
-            let destination = season_directory.join(format!(
+            let file_name = sanitize_filename_component(&format!(
                 "{} - S{:02}E{:02}.{}",
-                metadata.title, metadata.season, episode.number, extension
+                safe_title, metadata.season, episode.number, extension
             ));
+            let destination = season_directory.join(file_name);
             let source = fs::canonicalize(&episode.path)?;
             symlink_file(&source, &destination)?;
             links += 1;
@@ -106,16 +108,6 @@ fn validate_metadata(metadata: &ResolvedSeriesMetadata) -> Result<(), Box<dyn Er
         return Err("resolved series season must be greater than zero".into());
     }
 
-    let path = Path::new(&metadata.title);
-    if path.components().count() != 1
-        || !matches!(path.components().next(), Some(Component::Normal(_)))
-    {
-        return Err(format!(
-            "resolved series title {:?} is not a safe directory name",
-            metadata.title
-        )
-        .into());
-    }
     Ok(())
 }
 
@@ -134,7 +126,7 @@ mod tests {
             _category: &SeriesCategory,
         ) -> Result<ResolvedSeriesMetadata, Box<dyn Error>> {
             Ok(ResolvedSeriesMetadata {
-                title: "Example".into(),
+                title: "Example: Anime?/Part".into(),
                 season: 2,
             })
         }
@@ -144,8 +136,15 @@ mod tests {
     fn validates_resolved_metadata() {
         assert!(
             validate_metadata(&ResolvedSeriesMetadata {
-                title: "../unsafe".into(),
+                title: String::new(),
                 season: 1,
+            })
+            .is_err()
+        );
+        assert!(
+            validate_metadata(&ResolvedSeriesMetadata {
+                title: "Example".into(),
+                season: 0,
             })
             .is_err()
         );
@@ -191,13 +190,13 @@ mod tests {
 
         let filesystem_order = media_files(&target, &series_source).unwrap();
         assert_eq!(organize(&target, &FixedResolver).unwrap(), 2);
-        let season = destination.join("Example").join("Season 02");
+        let season = destination.join("Example_ Anime_Part").join("Season 02");
         assert_eq!(
-            fs::read_link(season.join("Example - S02E01.mkv")).unwrap(),
+            fs::read_link(season.join("Example_ Anime_Part - S02E01.mkv")).unwrap(),
             fs::canonicalize(&filesystem_order[0]).unwrap()
         );
         assert_eq!(
-            fs::read_link(season.join("Example - S02E02.mkv")).unwrap(),
+            fs::read_link(season.join("Example_ Anime_Part - S02E02.mkv")).unwrap(),
             fs::canonicalize(&filesystem_order[1]).unwrap()
         );
     }
