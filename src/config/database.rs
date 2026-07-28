@@ -1,6 +1,6 @@
-use std::path::{Path, PathBuf};
-use serde::Deserialize;
 use crate::fs::expand_user_dir;
+use serde::Deserialize;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
@@ -55,22 +55,12 @@ impl DatabaseConfig {
 #[cfg(test)]
 pub mod tests {
     use crate::config::DatabaseConfig;
-    use std::fs;
-    use std::path::Path;
 
     impl DatabaseConfig {
         /// Create a new database configuration for tests
         pub fn test() -> Self {
             Self {
-                file: "nenechi-cli.test.db".to_string()
-            }
-        }
-
-        pub fn delete_database_file(&self) {
-            let path = Path::new(&self.file);
-
-            if path.exists() {
-                fs::remove_file(path).unwrap()
+                file: "nenechi-cli.test.db".to_string(),
             }
         }
     }

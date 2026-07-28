@@ -7,10 +7,10 @@ mod schema;
 mod wallpapers;
 mod jellyfin;
 
-use crate::database::create_db_connection;
 use clap::Parser;
 use commands::{Commands, execute_command};
 use config::read_config;
+use crate::config::CliConfig;
 
 #[derive(Debug, Parser)]
 #[command(name = "nennechi-cli")]
@@ -22,12 +22,10 @@ struct Cli {
 
 fn main() {
     let args = Cli::parse();
-    let config = read_config();
+    let config = CliConfig::get_instance();
     logging::configure(&config.logging).expect("failed to configure logging");
 
-    let connection_pool = create_db_connection(&config.database);
-
-    let result = execute_command(args.command, connection_pool);
+    let result = execute_command(args.command);
 
     if let Err(err) = result {
         println!("{}", err);

@@ -2,8 +2,6 @@ use crate::config::{TidyWallpapersConfig, WallpapersConfig};
 use crate::fs::{path_match_any_pattern, symlink_file, unwrap_optional_os_str};
 use crate::wallpapers::{Wallpaper, WallpaperRepository};
 use clap::Subcommand;
-use diesel::SqliteConnection;
-use diesel::r2d2::{ConnectionManager, Pool};
 use log::{debug, info, warn};
 use nenechi_image::{ImageDetails, is_image_file};
 use nenechi_pixiv::{IllustrationId, fetch_tags};
@@ -20,7 +18,7 @@ use walkdir::{DirEntry, WalkDir};
 pub enum WallpapersCommands {
     Tidy,
     Index,
-    CleanIndex
+    CleanIndex,
 }
 
 impl Display for WallpapersCommands {
@@ -33,32 +31,27 @@ impl Display for WallpapersCommands {
     }
 }
 
-pub fn execute_wallpaper_command(
-    command: WallpapersCommands,
-    connection_pool: Pool<ConnectionManager<SqliteConnection>>
-) -> Result<(), String> {
+pub fn execute_wallpaper_command(command: WallpapersCommands) -> Result<(), String> {
     let config = WallpapersConfig::read()?;
     let ignore_patterns = config.ignore.clone();
     let directory = config.directory()?;
-    let wallpapers_repository = WallpaperRepository::new(connection_pool);
     let result = match command {
         WallpapersCommands::Tidy => tidy(
             config.tidy()?,
             ignore_patterns,
             directory,
-            wallpapers_repository
         ),
-        WallpapersCommands::Index => index(
-            ignore_patterns,
-            directory,
-            wallpapers_repository
-        ),
-        WallpapersCommands::CleanIndex => Err("Not implemented".into())
+        WallpapersCommands::Index => index(ignore_patterns, directory),
+        WallpapersCommands::CleanIndex => Err("Not implemented".into()),
     };
 
     match result {
         Ok(_) => Ok(()),
-        Err(err) => Err(format!("subcommand {} failed: {}", command.to_string(), err))
+        Err(err) => Err(format!(
+            "subcommand {} failed: {}",
+            command.to_string(),
+            err
+        )),
     }
 }
 
@@ -66,10 +59,9 @@ fn tidy(
     config: TidyWallpapersConfig,
     ignore_patterns: Vec<String>,
     directory: &Path,
-    repository: WallpaperRepository
 ) -> Result<(), Box<dyn Error>> {
     info!("tidying wallpapers for directory: {}", directory.display());
-
+    let repository = WallpaperRepository::get_instance();
     let walker = walk_directory(ignore_patterns, directory)?;
 
     for file in walker {
@@ -78,27 +70,34 @@ fn tidy(
 
         if !file.file_type().is_file() || !is_image_file(file.path()) {
             debug!("file is not an image, skipping: {}", path.display());
-            continue
+            continue;
         }
 
-        let wallpaper = find_indexed_or_index(&file, &repository);
+        let wallpaper = find_indexed_or_index(&file, repository);
 
         if let Err(e) = wallpaper {
-            warn!("failed retrieving indexed wallpaper {}: {}", path.display(), e);
-            continue
+            warn!(
+                "failed retrieving indexed wallpaper {}: {}",
+                path.display(),
+                e
+            );
+            continue;
         }
 
         create_wallpaper_symlinks(&config, path, &wallpaper.unwrap())?
     }
 
-    info!("finish tidying wallpapers for directory: {}", directory.display());
+    info!(
+        "finish tidying wallpapers for directory: {}",
+        directory.display()
+    );
     Ok(())
 }
 
 fn create_wallpaper_symlinks(
     config: &TidyWallpapersConfig,
     original: &Path,
-    wallpaper: &Wallpaper
+    wallpaper: &Wallpaper,
 ) -> Result<(), Box<dyn Error>> {
     create_wallpaper_aspect_ratio_symlinks(config, original, wallpaper)?;
     create_wallpaper_tags_symlinks(config, original, wallpaper)?;
@@ -109,7 +108,7 @@ fn create_wallpaper_symlinks(
 fn create_wallpaper_aspect_ratio_symlinks(
     config: &TidyWallpapersConfig,
     original: &Path,
-    wallpaper: &Wallpaper
+    wallpaper: &Wallpaper,
 ) -> Result<(), Box<dyn Error>> {
     let aspect_ratio_directory = config.aspect_ratio_directory()?;
     let aspect_ratio_directory = aspect_ratio_directory.join(wallpaper.aspect_ratio.to_string());
@@ -127,7 +126,7 @@ fn create_wallpaper_aspect_ratio_symlinks(
 fn create_wallpaper_tags_symlinks(
     config: &TidyWallpapersConfig,
     original: &Path,
-    wallpaper: &Wallpaper
+    wallpaper: &Wallpaper,
 ) -> Result<(), Box<dyn Error>> {
     let tags_directory = config.tags_directory()?;
 
@@ -152,16 +151,23 @@ fn create_wallpaper_tags_symlinks(
     Ok(())
 }
 
-fn find_indexed_or_index(file: &DirEntry, repository: &WallpaperRepository) -> Result<Wallpaper, Box<dyn Error>> {
+fn find_indexed_or_index(
+    file: &DirEntry,
+    repository: &WallpaperRepository,
+) -> Result<Wallpaper, Box<dyn Error>> {
     let path = file.path();
-    let path_string = path.to_str()
+    let path_string = path
+        .to_str()
         .ok_or(format!("unable to cast to string path {}", path.display()))?
         .to_string();
 
     let existing = repository.find_by_path(&path_string)?;
 
     if existing.is_none() {
-        info!("wallpaper is not indexed, trying to index: {}", path.display());
+        info!(
+            "wallpaper is not indexed, trying to index: {}",
+            path.display()
+        );
         let indexed = index_file(file, repository);
         if let Err(e) = indexed {
             warn!("wallpaper index failed for {}: {}", path.display(), e);
@@ -177,10 +183,9 @@ fn find_indexed_or_index(file: &DirEntry, repository: &WallpaperRepository) -> R
 fn index(
     ignore_patterns: Vec<String>,
     directory: &Path,
-    wallpapers_repository: WallpaperRepository
 ) -> Result<(), Box<dyn Error>> {
     info!("indexing wallpapers for directory: {}", directory.display());
-
+    let repository = WallpaperRepository::get_instance();
     let walker = walk_directory(ignore_patterns, directory)?;
 
     for file in walker {
@@ -188,26 +193,30 @@ fn index(
         let path = file.path();
         if !file.file_type().is_file() || !is_image_file(file.path()) {
             debug!("file is not an image, skipping: {}", path.display());
-            continue
+            continue;
         }
 
-        let index_result = index_file(&file, &wallpapers_repository);
+        let index_result = index_file(&file, repository);
         if let Err(e) = index_result {
             warn!("wallpaper index failed for {}: {}", path.display(), e)
         }
     }
 
-    info!("finish wallpapers index for directory: {}", directory.display());
+    info!(
+        "finish wallpapers index for directory: {}",
+        directory.display()
+    );
     Ok(())
 }
 
 /// index the file if it is not indexed
 fn index_file(
     file: &DirEntry,
-    wallpapers_repository: &WallpaperRepository
+    wallpapers_repository: &WallpaperRepository,
 ) -> Result<Wallpaper, Box<dyn Error>> {
     let path = file.path();
-    let path_string = path.to_str()
+    let path_string = path
+        .to_str()
         .ok_or(format!("unable to cast to string path {}", path.display()))?
         .to_string();
     debug!("indexing wallpaper: {}", &path_string);
@@ -240,14 +249,22 @@ fn index_file(
 fn resolve_image_tags(path: &Path) -> Vec<String> {
     let illustration_id = IllustrationId::from_path(path);
     if let Err(e) = illustration_id {
-        debug!("error resolving Pixiv illustration id for path {}: {}; ", path.display(), e);
-        return vec![]
+        debug!(
+            "error resolving Pixiv illustration id for path {}: {}; ",
+            path.display(),
+            e
+        );
+        return vec![];
     }
 
     let tags = fetch_tags(&illustration_id.unwrap());
     if let Err(e) = tags {
-        warn!("failed fetching Pixiv tags for path {}: {}", path.display(), e);
-        return vec![]
+        warn!(
+            "failed fetching Pixiv tags for path {}: {}",
+            path.display(),
+            e
+        );
+        return vec![];
     }
 
     sleep(Duration::from_millis(300));
@@ -260,18 +277,24 @@ fn resolve_image_tags(path: &Path) -> Vec<String> {
 
 fn walk_directory(
     ignore_patterns: Vec<String>,
-    directory: &Path
+    directory: &Path,
 ) -> Result<impl Iterator<Item = Result<DirEntry, walkdir::Error>> + use<>, Box<dyn Error>> {
     debug!("walking directory: {}", directory.display());
 
     let entry_filter = move |entry: &DirEntry| {
         if entry.file_type().is_symlink() {
-            debug!("path excluded because is a symlink: {}", entry.path().display());
+            debug!(
+                "path excluded because is a symlink: {}",
+                entry.path().display()
+            );
             return false;
         }
 
         if !ignore_patterns.is_empty() && path_match_any_pattern(entry.path(), &ignore_patterns) {
-            debug!("path excluded because is ignored: {}", entry.path().display());
+            debug!(
+                "path excluded because is ignored: {}",
+                entry.path().display()
+            );
             return false;
         }
 
@@ -284,4 +307,3 @@ fn walk_directory(
 
     Ok(walker)
 }
-

@@ -1,7 +1,10 @@
+use crate::database::{DatabasePool, get_database_connection};
 use crate::schema::wallpapers;
 use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
 use nenechi_image::AspectRatio;
+use std::sync::OnceLock;
+
+static WALLPAPER_REPOSITORY: OnceLock<WallpaperRepository> = OnceLock::new();
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Wallpaper {
@@ -56,12 +59,19 @@ impl TryFrom<WallpaperTable> for Wallpaper {
 }
 
 pub struct WallpaperRepository {
-    connection_pool: Pool<ConnectionManager<SqliteConnection>>,
+    connection_pool: DatabasePool,
 }
 
 impl WallpaperRepository {
-    pub fn new(connection_pool: Pool<ConnectionManager<SqliteConnection>>) -> Self {
-        Self { connection_pool }
+    pub fn new(connection_pool: &DatabasePool) -> Self {
+        Self { connection_pool: connection_pool.clone() }
+    }
+
+    pub fn get_instance<'a>() -> &'a Self {
+        WALLPAPER_REPOSITORY.get_or_init(|| {
+            let connection = get_database_connection();
+            Self::new(connection)
+        })
     }
 
     pub fn find_by_id(&self, id: &str) -> Result<Option<Wallpaper>, Box<dyn std::error::Error>> {
@@ -73,11 +83,14 @@ impl WallpaperRepository {
 
         match result {
             Some(table_model) => Ok(Some(table_model.try_into()?)),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
-    pub fn find_by_path(&self, path: &str) -> Result<Option<Wallpaper>, Box<dyn std::error::Error>> {
+    pub fn find_by_path(
+        &self,
+        path: &str,
+    ) -> Result<Option<Wallpaper>, Box<dyn std::error::Error>> {
         let mut connection = self.connection_pool.get()?;
         let result: Option<WallpaperTable> = wallpapers::table
             .filter(wallpapers::path.eq(path))
@@ -86,7 +99,7 @@ impl WallpaperRepository {
 
         match result {
             Some(table_model) => Ok(Some(table_model.try_into()?)),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
@@ -145,7 +158,7 @@ mod tests {
                 tags: vec!["konosuba".to_string(), "megumin".to_string()],
                 path: "wallpapers/megumin.jpeg".to_string(),
                 file_name: "megumin.jpeg".to_string(),
-                aspect_ratio: AspectRatio::Square
+                aspect_ratio: AspectRatio::Square,
             }
         }
     }
@@ -165,9 +178,7 @@ mod tests {
             .first(&mut connection)
             .optional()
             .unwrap();
-        let existing = result.unwrap()
-            .try_into()
-            .unwrap();
+        let existing = result.unwrap().try_into().unwrap();
 
         assert_eq!(wallpaper, existing);
     }
@@ -180,11 +191,9 @@ mod tests {
         let repository = WallpaperRepository::new(connection_pool);
         let mut wallpaper = Wallpaper::test();
 
-        repository.insert(
-            &wallpaper.clone()
-                .try_into()
-                .unwrap()
-        ).unwrap();
+        repository
+            .insert(&wallpaper.clone().try_into().unwrap())
+            .unwrap();
 
         wallpaper.path = "wallpapers/aqua.jpeg".to_string();
         wallpaper.file_name = "aqua.jpeg".to_string();
@@ -196,9 +205,7 @@ mod tests {
             .first(&mut connection)
             .optional()
             .unwrap();
-        let existing = result.unwrap()
-            .try_into()
-            .unwrap();
+        let existing = result.unwrap().try_into().unwrap();
 
         assert_eq!(wallpaper, existing);
     }

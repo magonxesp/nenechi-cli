@@ -1,8 +1,6 @@
 use crate::wallpapers::command::WallpapersCommands;
 use crate::wallpapers::command::execute_wallpaper_command;
 use clap::Subcommand;
-use diesel::SqliteConnection;
-use diesel::r2d2::{ConnectionManager, Pool};
 use log::warn;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
@@ -12,7 +10,7 @@ pub enum Commands {
     Wallpapers {
         #[command(subcommand)]
         command: WallpapersCommands,
-    }
+    },
 }
 
 impl Display for Commands {
@@ -23,15 +21,11 @@ impl Display for Commands {
     }
 }
 
-pub fn execute_command(
-    command: Commands,
-    connection_pool: Pool<ConnectionManager<SqliteConnection>>
-) -> Result<(), String> {
+pub fn execute_command(command: Commands) -> Result<(), String> {
     let result = match command.clone() {
-        Commands::Wallpapers { command: subcommand } => execute_wallpaper_command(
-            subcommand,
-            connection_pool
-        ),
+        Commands::Wallpapers {
+            command: subcommand,
+        } => execute_wallpaper_command(subcommand),
     };
 
     if let Err(err) = result {
