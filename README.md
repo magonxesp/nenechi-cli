@@ -48,6 +48,30 @@ sudo cp examples/config.yaml /etc/nenechi/config.yaml
 sudo cp examples/conf.d/wallpapers.yaml /etc/nenechi/conf.d/wallpapers.yaml
 ```
 
+Para indexar targets de Jellyfin con categoría `anime`, configura el Client ID
+de la API v2 de MyAnimeList en `config.yaml`:
+
+```yaml
+myanimelist:
+  api_key: your-client-id
+```
+
+Después ejecuta:
+
+```bash
+nenechi-cli jellyfin index
+```
+
+Para crear en cada `destination` la estructura que espera Jellyfin y enlazar
+los ficheros del `source`, ejecuta:
+
+```bash
+nenechi-cli jellyfin mount
+```
+
+El comando consulta primero el índice de series y añade automáticamente las
+que todavía no estén indexadas.
+
 ## Testing
 
 Las pruebas de integración de MyAnimeList necesitan una API key. Crea un

@@ -4,6 +4,8 @@ use serde::Deserialize;
 use crate::{Client, ClientError};
 
 const ANIME_DETAILS_FIELDS: &str = "id,title,main_picture,alternative_titles,start_date,end_date,synopsis,mean,rank,popularity,num_list_users,num_scoring_users,nsfw,created_at,updated_at,media_type,status,genres,my_list_status,num_episodes,start_season,broadcast,source,average_episode_duration,rating,pictures,background,related_anime,related_manga,recommendations,studios,statistics";
+const MAX_SEARCH_QUERY_LENGTH: usize = 64;
+const SEARCH_QUERY_PREFIX_LENGTH: usize = 40;
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct AnimeSearchResponse {
@@ -131,6 +133,8 @@ pub enum RelationType {
     ParentStory,
     Summary,
     FullStory,
+    #[serde(other)]
+    Other,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -191,10 +195,87 @@ impl Client {
     }
 
     fn search_anime_request(&self, name: &str) -> Result<RequestBuilder, ClientError> {
-        if name.trim().is_empty() {
+        let name = name.trim();
+        if name.is_empty() {
             return Err(ClientError::EmptySearchQuery);
         }
 
-        Ok(self.get("anime").query(&[("q", name)]))
+        // MyAnimeList rejects search queries longer than 64 characters with
+        // `400 Bad Request`. Keep both ends because season identifiers tend to
+        // be at the end of otherwise identical long titles.
+        let query = compact_search_query(name);
+
+        Ok(self.get("anime").query(&[("q", query)]))
+    }
+}
+
+fn compact_search_query(name: &str) -> String {
+    if name.chars().count() <= MAX_SEARCH_QUERY_LENGTH {
+        return name.into();
+    }
+
+    let suffix_length = MAX_SEARCH_QUERY_LENGTH - SEARCH_QUERY_PREFIX_LENGTH - 1;
+    let prefix = name
+        .chars()
+        .take(SEARCH_QUERY_PREFIX_LENGTH)
+        .collect::<String>();
+    let suffix = name
+        .chars()
+        .rev()
+        .take(suffix_length)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect::<String>();
+
+    format!("{prefix} {suffix}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::de::value::{Error as DeserializerError, StrDeserializer};
+
+    #[test]
+    fn unknown_relation_types_are_deserialized_as_other() {
+        let relation =
+            RelationType::deserialize(StrDeserializer::<DeserializerError>::new("other")).unwrap();
+        let future_relation =
+            RelationType::deserialize(StrDeserializer::<DeserializerError>::new("future_relation"))
+                .unwrap();
+
+        assert_eq!(relation, RelationType::Other);
+        assert_eq!(future_relation, RelationType::Other);
+    }
+
+    #[test]
+    fn long_search_queries_keep_the_beginning_and_end() {
+        let client = Client::new("client-id").unwrap();
+        let name = format!("{}{}", "a".repeat(50), "b".repeat(30));
+
+        let request = client.search_anime_request(&name).unwrap().build().unwrap();
+        let query = request
+            .url()
+            .query_pairs()
+            .find_map(|(key, value)| (key == "q").then(|| value.into_owned()))
+            .unwrap();
+
+        assert_eq!(query.chars().count(), MAX_SEARCH_QUERY_LENGTH);
+        assert_eq!(query, format!("{} {}", "a".repeat(40), "b".repeat(23)));
+    }
+
+    #[test]
+    fn search_query_limit_respects_unicode_boundaries() {
+        let client = Client::new("client-id").unwrap();
+        let name = format!("{}{}", "本".repeat(50), "語".repeat(30));
+
+        let request = client.search_anime_request(&name).unwrap().build().unwrap();
+        let query = request
+            .url()
+            .query_pairs()
+            .find_map(|(key, value)| (key == "q").then(|| value.into_owned()))
+            .unwrap();
+
+        assert_eq!(query, format!("{} {}", "本".repeat(40), "語".repeat(23)));
     }
 }

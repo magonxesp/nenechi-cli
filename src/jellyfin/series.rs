@@ -7,7 +7,7 @@ use std::path::{Component, Path, PathBuf};
 use walkdir::WalkDir;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SeriesMetadata {
+pub struct ResolvedSeriesMetadata {
     pub title: String,
     pub season: u32,
 }
@@ -17,7 +17,7 @@ pub trait SeriesMetadataResolver {
         &self,
         source_directory: &Path,
         category: &SeriesCategory,
-    ) -> Result<SeriesMetadata, Box<dyn Error>>;
+    ) -> Result<ResolvedSeriesMetadata, Box<dyn Error>>;
 }
 
 pub fn organize(
@@ -43,7 +43,10 @@ pub fn organize(
     for entry in fs::read_dir(&target.source)? {
         let entry = entry?;
         let series_directory = entry.path();
-        if !series_directory.is_dir() || series_directory.is_symlink() {
+        if !series_directory.is_dir()
+            || series_directory.is_symlink()
+            || target.ignores(&series_directory)
+        {
             continue;
         }
 
@@ -82,7 +85,11 @@ pub fn organize(
 
 fn media_files(target: &TargetConfig, directory: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     let mut files = Vec::new();
-    for entry in WalkDir::new(directory).follow_links(false) {
+    for entry in WalkDir::new(directory)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|entry| !target.ignores(entry.path()))
+    {
         let entry = entry?;
         if entry.file_type().is_file() && target.includes(entry.path()) {
             files.push(entry.into_path());
@@ -91,7 +98,7 @@ fn media_files(target: &TargetConfig, directory: &Path) -> Result<Vec<PathBuf>, 
     Ok(files)
 }
 
-fn validate_metadata(metadata: &SeriesMetadata) -> Result<(), Box<dyn Error>> {
+fn validate_metadata(metadata: &ResolvedSeriesMetadata) -> Result<(), Box<dyn Error>> {
     if metadata.title.trim().is_empty() {
         return Err("resolved series title cannot be empty".into());
     }
@@ -125,8 +132,8 @@ mod tests {
             &self,
             _source_directory: &Path,
             _category: &SeriesCategory,
-        ) -> Result<SeriesMetadata, Box<dyn Error>> {
-            Ok(SeriesMetadata {
+        ) -> Result<ResolvedSeriesMetadata, Box<dyn Error>> {
+            Ok(ResolvedSeriesMetadata {
                 title: "Example".into(),
                 season: 2,
             })
@@ -136,7 +143,7 @@ mod tests {
     #[test]
     fn validates_resolved_metadata() {
         assert!(
-            validate_metadata(&SeriesMetadata {
+            validate_metadata(&ResolvedSeriesMetadata {
                 title: "../unsafe".into(),
                 season: 1,
             })
@@ -179,6 +186,7 @@ mod tests {
                 },
             }),
             include: vec!["*.mkv".into()],
+            ignore: Vec::new(),
         };
 
         let filesystem_order = media_files(&target, &series_source).unwrap();

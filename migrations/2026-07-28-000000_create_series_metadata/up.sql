@@ -1,0 +1,6 @@
+CREATE TABLE series_metadata (
+    id VARCHAR(36) NOT NULL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    path TEXT NOT NULL UNIQUE,
+    season INTEGER NOT NULL DEFAULT 1 CHECK (season > 0)
+);

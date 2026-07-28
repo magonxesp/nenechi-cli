@@ -66,7 +66,7 @@ fn create_db_connection(config: &DatabaseConfig) -> DatabasePool {
 #[cfg(test)]
 pub mod tests {
     use crate::database::{DatabasePool, get_database_connection};
-    use crate::schema::wallpapers;
+    use crate::schema::{series_metadata, wallpapers};
     use diesel::RunQueryDsl;
 
     #[test]
@@ -81,6 +81,9 @@ pub mod tests {
         let connection_pool = get_database_connection();
         let mut connection = connection_pool.get().unwrap();
         diesel::delete(wallpapers::table)
+            .execute(&mut connection)
+            .unwrap();
+        diesel::delete(series_metadata::table)
             .execute(&mut connection)
             .unwrap();
         connection_pool

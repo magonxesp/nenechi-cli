@@ -6,7 +6,7 @@ use std::path::Path;
 use nenechi_myanimelist::{Anime, AnimeDetails, Client, RelationType};
 
 use crate::jellyfin::config::SeriesCategory;
-use crate::jellyfin::series::{SeriesMetadata, SeriesMetadataResolver};
+use crate::jellyfin::series::{ResolvedSeriesMetadata, SeriesMetadataResolver};
 
 const TV_MEDIA_TYPE: &str = "tv";
 
@@ -62,6 +62,10 @@ pub enum AnimeResolverError {
     EmptyTitle,
     AnimeNotFound(String),
     NoTvAnimeFound(String),
+    AmbiguousAnimeTitle {
+        title: String,
+        candidates: Vec<String>,
+    },
     NotAnimeCategory,
     RelationCycle(u64),
     AnimeOutsideMainSequence(u64),
@@ -81,6 +85,11 @@ impl Display for AnimeResolverError {
             Self::NoTvAnimeFound(title) => write!(
                 formatter,
                 "MyAnimeList no encontró una entrada de tipo TV para {title:?}"
+            ),
+            Self::AmbiguousAnimeTitle { title, candidates } => write!(
+                formatter,
+                "MyAnimeList devolvió varias entradas de tipo TV para {title:?} sin una coincidencia exacta: {}",
+                candidates.join(", ")
             ),
             Self::NotAnimeCategory => {
                 formatter.write_str("el resolver de anime solo admite la categoría anime")
@@ -109,7 +118,7 @@ impl AnimeResolver {
         Self { client }
     }
 
-    pub fn resolve_title(&self, title: &str) -> Result<SeriesMetadata, AnimeResolverError> {
+    pub fn resolve_title(&self, title: &str) -> Result<ResolvedSeriesMetadata, AnimeResolverError> {
         let (target_id, seasons) = self.resolve_seasons(title)?;
         let target = seasons
             .iter()
@@ -121,7 +130,7 @@ impl AnimeResolver {
             .title
             .clone();
 
-        Ok(SeriesMetadata {
+        Ok(ResolvedSeriesMetadata {
             title: series_title,
             season: target.season,
         })
@@ -178,7 +187,7 @@ impl AnimeResolver {
         cache: &mut HashMap<u64, AnimeRecord>,
     ) -> Result<AnimeRecord, AnimeResolverError> {
         results.sort_by_key(|result| !same_title(&result.title, query));
-        let mut first_tv = None;
+        let mut tv_candidates = Vec::new();
 
         for result in results {
             let anime = self.get_cached(result.id, cache)?;
@@ -193,10 +202,20 @@ impl AnimeResolver {
             {
                 return Ok(anime);
             }
-            first_tv.get_or_insert(anime);
+            tv_candidates.push(anime);
         }
 
-        first_tv.ok_or_else(|| AnimeResolverError::NoTvAnimeFound(query.into()))
+        match tv_candidates.len() {
+            0 => Err(AnimeResolverError::NoTvAnimeFound(query.into())),
+            1 => Ok(tv_candidates.pop().unwrap()),
+            _ => Err(AnimeResolverError::AmbiguousAnimeTitle {
+                title: query.into(),
+                candidates: tv_candidates
+                    .into_iter()
+                    .map(|anime| format!("{} ({})", anime.title, anime.id))
+                    .collect(),
+            }),
+        }
     }
 
     fn find_root(
@@ -292,7 +311,7 @@ impl SeriesMetadataResolver for AnimeResolver {
         &self,
         source_directory: &Path,
         category: &SeriesCategory,
-    ) -> Result<SeriesMetadata, Box<dyn Error>> {
+    ) -> Result<ResolvedSeriesMetadata, Box<dyn Error>> {
         if category != &SeriesCategory::Anime {
             return Err(Box::new(AnimeResolverError::NotAnimeCategory));
         }
@@ -311,7 +330,15 @@ fn is_tv(anime: &AnimeRecord) -> bool {
 }
 
 fn same_title(left: &str, right: &str) -> bool {
-    left.trim().eq_ignore_ascii_case(right.trim())
+    normalize_title(left) == normalize_title(right)
+}
+
+fn normalize_title(title: &str) -> String {
+    title
+        .chars()
+        .filter(|character| character.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
 }
 
 fn select_previous(current: &AnimeRecord, candidates: Vec<AnimeRecord>) -> Option<AnimeRecord> {
@@ -470,6 +497,97 @@ mod tests {
         assert_eq!(
             resolve_from_cache(&resolver, 1, &mut cache),
             Err(AnimeResolverError::RelationCycle(1))
+        );
+    }
+
+    #[test]
+    fn title_matching_ignores_case_whitespace_and_punctuation() {
+        assert!(same_title(
+            "Honzuki no Gekokujou: Shisho ni Naru Tame",
+            "honzuki no gekokujou shisho ni naru tame",
+        ));
+    }
+
+    #[test]
+    fn title_matching_keeps_seasons_distinct() {
+        assert!(!same_title(
+            "Honzuki no Gekokujou 2nd Season",
+            "Honzuki no Gekokujou 3rd Season",
+        ));
+    }
+
+    #[test]
+    fn selects_the_exact_normalized_title_instead_of_api_order() {
+        let (resolver, mut cache) = resolver(vec![
+            anime(
+                2,
+                "Example: Long Title 2nd Season",
+                "tv",
+                "2021-01-01",
+                &[],
+                &[],
+            ),
+            anime(
+                3,
+                "Example: Long Title 3rd Season",
+                "tv",
+                "2022-01-01",
+                &[],
+                &[],
+            ),
+        ]);
+        let results = vec![
+            Anime {
+                id: 2,
+                title: "Example: Long Title 2nd Season".into(),
+                main_picture: None,
+            },
+            Anime {
+                id: 3,
+                title: "Example: Long Title 3rd Season".into(),
+                main_picture: None,
+            },
+        ];
+
+        let selected = resolver
+            .select_search_result("example long title 3rd season", results, &mut cache)
+            .unwrap();
+
+        assert_eq!(selected.id, 3);
+    }
+
+    #[test]
+    fn rejects_ambiguous_search_results_without_an_exact_title() {
+        let (resolver, mut cache) = resolver(vec![
+            anime(2, "Example 2nd Season", "tv", "2021-01-01", &[], &[]),
+            anime(3, "Example 3rd Season", "tv", "2022-01-01", &[], &[]),
+        ]);
+        let results = vec![
+            Anime {
+                id: 2,
+                title: "Example 2nd Season".into(),
+                main_picture: None,
+            },
+            Anime {
+                id: 3,
+                title: "Example 3rd Season".into(),
+                main_picture: None,
+            },
+        ];
+
+        let error = resolver
+            .select_search_result("Example", results, &mut cache)
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            AnimeResolverError::AmbiguousAnimeTitle {
+                title: "Example".into(),
+                candidates: vec![
+                    "Example 2nd Season (2)".into(),
+                    "Example 3rd Season (3)".into(),
+                ],
+            }
         );
     }
 }

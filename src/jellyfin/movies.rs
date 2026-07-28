@@ -18,7 +18,7 @@ pub fn organize(target: &TargetConfig) -> Result<usize, Box<dyn Error>> {
         let entry = entry?;
         let path = entry.path();
 
-        if path.is_symlink() {
+        if path.is_symlink() || target.ignores(&path) {
             continue;
         }
         if path.is_file() {
@@ -45,7 +45,11 @@ fn organize_movie_directory(
     let movie_name = file_name(movie_directory)?;
     let mut links = 0;
 
-    for entry in WalkDir::new(movie_directory).follow_links(false) {
+    for entry in WalkDir::new(movie_directory)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|entry| !target.ignores(entry.path()))
+    {
         let entry = entry?;
         if !entry.file_type().is_file() || !target.includes(entry.path()) {
             continue;
@@ -101,6 +105,7 @@ mod tests {
             destination: destination.clone(),
             series: None,
             include: vec!["*.mkv".into()],
+            ignore: Vec::new(),
         };
 
         assert_eq!(organize(&target).unwrap(), 1);

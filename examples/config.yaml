@@ -7,3 +7,7 @@ logging:
 database:
   # Ruta del fichero de la base de datos
   file: ~/.local/nenechi/nenechi-cli.db
+
+myanimelist:
+  # Client ID de la API v2 de MyAnimeList.
+  api_key: your-client-id

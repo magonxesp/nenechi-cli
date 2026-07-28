@@ -1,8 +1,10 @@
 use glob::Pattern;
-use log::{debug, warn};
+use log::{info, warn};
 use std::env;
 use std::error::Error;
 use std::ffi::OsStr;
+use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 pub fn expand_user_dir(path: impl AsRef<Path>) -> PathBuf {
@@ -25,7 +27,10 @@ pub fn path_match_any_pattern(path: &Path, patterns: &[String]) -> bool {
     for pattern in patterns {
         match Pattern::new(pattern.as_str()) {
             Ok(pattern) => valid_patterns.push(pattern),
-            Err(_) => warn!("ignore pattern {} is not valid and will not be applied", pattern),
+            Err(_) => warn!(
+                "ignore pattern {} is not valid and will not be applied",
+                pattern
+            ),
         }
     }
 
@@ -39,12 +44,8 @@ pub fn path_match_any_pattern(path: &Path, patterns: &[String]) -> bool {
 }
 
 pub fn unwrap_optional_os_str(os_str: Option<&OsStr>) -> Result<String, Box<dyn Error>> {
-    let path_str = os_str
-        .ok_or("os string is none")?
-        .to_str();
-    let path_string = path_str
-        .ok_or("str is none")?
-        .to_string();
+    let path_str = os_str.ok_or("os string is none")?.to_str();
+    let path_string = path_str.ok_or("str is none")?.to_string();
 
     Ok(path_string)
 }
@@ -56,18 +57,38 @@ pub fn symlink_file(original: &Path, link: &Path) -> Result<(), Box<dyn Error>> 
         return Err("original path is not a file".into());
     }
 
-    if link.exists() {
-        debug!("symlink already exists, skipping: {}", link.display());
+    if fs::symlink_metadata(link).is_ok() {
+        info!(
+            "symbolic link already exists, creation is not necessary: {}",
+            link.display()
+        );
         return Ok(());
     }
 
     #[cfg(unix)]
-    std::os::unix::fs::symlink(original, link)?;
+    let result = std::os::unix::fs::symlink(original, link);
 
     #[cfg(windows)]
-    std::os::windows::fs::symlink_file(original, link)?;
+    let result = std::os::windows::fs::symlink_file(original, link);
 
-    Ok(())
+    match result {
+        Ok(()) => {
+            info!(
+                "created symbolic link: {} -> {}",
+                link.display(),
+                original.display()
+            );
+            Ok(())
+        }
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+            info!(
+                "symbolic link already exists, creation is not necessary: {}",
+                link.display()
+            );
+            Ok(())
+        }
+        Err(error) => Err(error.into()),
+    }
 }
 
 #[cfg(test)]
@@ -111,49 +132,61 @@ mod tests {
             "wallpapers/cities/**/*".to_string(),
         ];
 
-        assert_eq!(true, path_match_any_pattern(
-            Path::new("/Users/megumin/Images/wallpapers/dogs.mp4"),
-            &patterns
-        ));
+        assert_eq!(
+            true,
+            path_match_any_pattern(
+                Path::new("/Users/megumin/Images/wallpapers/dogs.mp4"),
+                &patterns
+            )
+        );
 
-        assert_eq!(true, path_match_any_pattern(
-            Path::new("wallpapers/dogs.avi"),
-            &patterns
-        ));
+        assert_eq!(
+            true,
+            path_match_any_pattern(Path::new("wallpapers/dogs.avi"), &patterns)
+        );
 
-        assert_eq!(true, path_match_any_pattern(
-            Path::new("wallpapers/landscapes/mountain.png"),
-            &patterns
-        ));
+        assert_eq!(
+            true,
+            path_match_any_pattern(Path::new("wallpapers/landscapes/mountain.png"), &patterns)
+        );
 
-        assert_eq!(true, path_match_any_pattern(
-            Path::new("wallpapers/cats"),
-            &patterns
-        ));
+        assert_eq!(
+            true,
+            path_match_any_pattern(Path::new("wallpapers/cats"), &patterns)
+        );
 
-        assert_eq!(true, path_match_any_pattern(
-            Path::new("wallpapers/cats/my_favorites"),
-            &patterns
-        ));
+        assert_eq!(
+            true,
+            path_match_any_pattern(Path::new("wallpapers/cats/my_favorites"), &patterns)
+        );
 
-        assert_eq!(true, path_match_any_pattern(
-            Path::new("wallpapers/cats/my_favorites/white-cat.png"),
-            &patterns
-        ));
+        assert_eq!(
+            true,
+            path_match_any_pattern(
+                Path::new("wallpapers/cats/my_favorites/white-cat.png"),
+                &patterns
+            )
+        );
 
-        assert_eq!(true, path_match_any_pattern(
-            Path::new("wallpapers/cities/london/museum"),
-            &patterns
-        ));
+        assert_eq!(
+            true,
+            path_match_any_pattern(Path::new("wallpapers/cities/london/museum"), &patterns)
+        );
 
-        assert_eq!(true, path_match_any_pattern(
-            Path::new("wallpapers/cities/london/big-ben.jpeg"),
-            &patterns
-        ));
+        assert_eq!(
+            true,
+            path_match_any_pattern(
+                Path::new("wallpapers/cities/london/big-ben.jpeg"),
+                &patterns
+            )
+        );
 
-        assert_eq!(true, path_match_any_pattern(
-            Path::new("wallpapers/cities/london/river/boat.jpeg"),
-            &patterns
-        ));
+        assert_eq!(
+            true,
+            path_match_any_pattern(
+                Path::new("wallpapers/cities/london/river/boat.jpeg"),
+                &patterns
+            )
+        );
     }
 }

@@ -26,6 +26,11 @@ jellyfin:
         - '*.mp4'
         - '*.avi'
 
+      # Globs relativos a source que no se deben indexar ni organizar.
+      ignore:
+        - 'Ignored *'
+        - '**/*.part'
+
     - name: live-action-series
       type: series
       source: /mnt/downloads/live-action

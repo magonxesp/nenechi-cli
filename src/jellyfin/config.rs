@@ -88,6 +88,8 @@ pub struct TargetConfig {
     pub series: Option<SeriesConfig>,
     #[serde(default = "default_include_patterns")]
     pub include: Vec<String>,
+    #[serde(default)]
+    pub ignore: Vec<String>,
 }
 
 impl TargetConfig {
@@ -118,6 +120,14 @@ impl TargetConfig {
             GlobPattern::new(pattern).map_err(|error| {
                 format!(
                     "invalid include pattern {:?} in Jellyfin target {:?}: {error}",
+                    pattern, self.name
+                )
+            })?;
+        }
+        for pattern in &self.ignore {
+            GlobPattern::new(pattern).map_err(|error| {
+                format!(
+                    "invalid ignore pattern {:?} in Jellyfin target {:?}: {error}",
                     pattern, self.name
                 )
             })?;
@@ -165,6 +175,13 @@ impl TargetConfig {
                 || path
                     .file_name()
                     .is_some_and(|file_name| pattern.matches_path(Path::new(file_name)))
+        })
+    }
+
+    pub(crate) fn ignores(&self, path: &Path) -> bool {
+        let relative = path.strip_prefix(&self.source).unwrap_or(path);
+        self.ignore.iter().any(|value| {
+            GlobPattern::new(value).is_ok_and(|pattern| pattern.matches_path(relative))
         })
     }
 }
@@ -238,6 +255,11 @@ mod tests {
             serde_yaml::from_str(include_str!("../../examples/conf.d/jellyfin.yaml")).unwrap();
         root.jellyfin.validate().unwrap();
         assert_eq!(root.jellyfin.targets[0].target_type, TargetType::Series);
+        assert!(!root.jellyfin.targets[0].ignore.is_empty());
+        assert!(root.jellyfin.targets[1].ignore.is_empty());
+        assert!(
+            root.jellyfin.targets[0].ignores(Path::new("/mnt/downloads/anime/Ignored Example"))
+        );
     }
 
     #[test]
@@ -249,5 +271,14 @@ mod tests {
         };
 
         assert!(episode.validate("anime").is_err());
+    }
+
+    #[test]
+    fn rejects_an_invalid_ignore_glob() {
+        let mut root: JellyfinConfigRoot =
+            serde_yaml::from_str(include_str!("../../examples/conf.d/jellyfin.yaml")).unwrap();
+        root.jellyfin.targets[0].ignore = vec!["[".into()];
+
+        assert!(root.jellyfin.validate().is_err());
     }
 }
