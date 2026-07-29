@@ -1,78 +1,109 @@
-# Nenechi cli
+# Nenechi CLI
 
-Comandos utiles para el servidor 😎
+Colección de utilidades para organizar la biblioteca multimedia del servidor
+Nenechi.
 
 ## Instalar
 
-## Como usarlo
+Descarga el paquete `.deb` para tu arquitectura (`amd64` o `arm64`) desde la
+[última versión publicada](https://github.com/magonxesp/nenechi-cli/releases/latest).
+Este enlace redirige automáticamente a la release más reciente.
+
+```bash
+sudo dpkg -i ./nenechi_*.deb
+```
+
+Comprueba la instalación con:
+
+```bash
+nenechi-cli --help
+```
+
+## Cómo usarlo
+
+La aplicación agrupa sus utilidades en dos comandos:
+
+| Comando | Descripción |
+| --- | --- |
+| `jellyfin` | Indexa y organiza series y películas para Jellyfin. |
+| `wallpapers` | Indexa y clasifica fondos de pantalla. |
+
+Puedes consultar los subcomandos disponibles en cualquier nivel:
+
+```bash
+nenechi-cli --help
+nenechi-cli jellyfin --help
+nenechi-cli wallpapers --help
+```
+
+### Jellyfin
+
+Configura primero los directorios de origen y destino siguiendo el
+[ejemplo de configuración de Jellyfin](examples/conf.d/jellyfin.yaml).
+Si alguno de los targets de series tiene la categoría `anime`, añade también
+un Client ID de la API v2 de MyAnimeList al
+[fichero de configuración general](examples/config.yaml).
+
+```bash
+# Indexa las series y obtiene sus metadatos.
+nenechi-cli jellyfin index
+
+# Crea en los destinos la estructura de Jellyfin mediante enlaces simbólicos.
+nenechi-cli jellyfin mount
+```
+
+`mount` actualiza primero el índice de las series que todavía no estén
+registradas. Los nombres creados en el destino se normalizan para que sean
+compatibles con clientes Windows a través de SMB, sin modificar los ficheros
+originales ni los títulos almacenados en SQLite.
+
+### Wallpapers
+
+Configura los directorios, patrones ignorados y destinos de clasificación
+siguiendo el
+[ejemplo de configuración de wallpapers](examples/conf.d/wallpapers.yaml).
+
+```bash
+# Guarda en SQLite los metadatos de las imágenes encontradas.
+nenechi-cli wallpapers index
+
+# Clasifica las imágenes mediante enlaces simbólicos por formato y tags.
+nenechi-cli wallpapers tidy
+```
+
+Cuando el nombre de una imagen contiene un identificador de Pixiv, el
+indexado intenta recuperar también sus tags. `tidy` indexa automáticamente
+las imágenes que todavía no estén registradas. El subcomando `clean-index`
+aparece en la ayuda, pero aún no está implementado.
 
 ## Configuración
 
-Los ficheros de ejemplo se encuentran en el directorio
-[`examples`](https://github.com/magonxesp/nenechi-cli/tree/main/examples) del
-repositorio. Descárgalos con:
-
-```bash
-git clone --depth 1 https://github.com/magonxesp/nenechi-cli.git
-cd nenechi-cli
-```
-
-Después, copia `examples/config.yaml` y el directorio `examples/conf.d` en una
-de las siguientes ubicaciones. El programa las comprueba en este orden:
+La configuración está dividida entre el fichero general
+[`config.yaml`](examples/config.yaml) y un fichero por comando dentro de
+[`conf.d`](examples/conf.d). Copia los ejemplos a una de estas ubicaciones,
+que se comprueban en este orden:
 
 1. `~/.nenechi`
 2. `~/.config/nenechi`
 3. `/etc/nenechi`
 
-Por ejemplo, para usar `~/.nenechi`:
-
-```bash
-mkdir -p ~/.nenechi/conf.d
-cp examples/config.yaml ~/.nenechi/config.yaml
-cp examples/conf.d/wallpapers.yaml ~/.nenechi/conf.d/wallpapers.yaml
-```
-
-Para usar `~/.config/nenechi`:
+Por ejemplo, para una instalación de usuario:
 
 ```bash
 mkdir -p ~/.config/nenechi/conf.d
-cp examples/config.yaml ~/.config/nenechi/config.yaml
-cp examples/conf.d/wallpapers.yaml ~/.config/nenechi/conf.d/wallpapers.yaml
+cp /usr/share/nenechi/config.yaml ~/.config/nenechi/config.yaml
+cp /usr/share/nenechi/conf.d/*.yaml ~/.config/nenechi/conf.d/
 ```
 
-Para instalar la configuración global en `/etc/nenechi`:
+Si los ejemplos no están disponibles en `/usr/share/nenechi`, puedes
+descargarlos desde el directorio
+[`examples`](https://github.com/magonxesp/nenechi-cli/tree/main/examples) de
+la rama `main` del repositorio.
 
-```bash
-sudo mkdir -p /etc/nenechi/conf.d
-sudo cp examples/config.yaml /etc/nenechi/config.yaml
-sudo cp examples/conf.d/wallpapers.yaml /etc/nenechi/conf.d/wallpapers.yaml
-```
-
-Para indexar targets de Jellyfin con categoría `anime`, configura el Client ID
-de la API v2 de MyAnimeList en `config.yaml`:
-
-```yaml
-myanimelist:
-  api_key: your-client-id
-```
-
-Después ejecuta:
-
-```bash
-nenechi-cli jellyfin index
-```
-
-Para crear en cada `destination` la estructura que espera Jellyfin y enlazar
-los ficheros del `source`, ejecuta:
-
-```bash
-nenechi-cli jellyfin mount
-```
-
-El comando consulta primero el índice de series y añade automáticamente las
-que todavía no estén indexadas. Los nombres generados en `destination` se
-normalizan para que sean compatibles con clientes Windows a través de SMB,
-sin modificar los ficheros originales ni los títulos guardados en SQLite.
+Antes de ejecutar los comandos, adapta las rutas, credenciales y permisos de
+los ejemplos a tu entorno. La referencia de cada comando se mantiene en su
+propio fichero: [Jellyfin](examples/conf.d/jellyfin.yaml) y
+[wallpapers](examples/conf.d/wallpapers.yaml).
 
 ## Testing
 

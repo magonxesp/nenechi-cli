@@ -15,7 +15,7 @@ fi
 
 mkdir -p "$deb_package_directory/DEBIAN"
 mkdir -p "$deb_package_directory/usr/bin"
-mkdir -p "$deb_package_directory/etc/nenechi/conf.d"
+mkdir -p "$deb_package_directory/usr/share/nenechi/conf.d"
 
 control=$(cat <<EOF
 Package: nenechi
@@ -29,15 +29,10 @@ Homepage: https://github.com/magonxesp/nenechi-cli
 EOF
 )
 
-conffiles=$(cat <<EOF
-/etc/nenechi/config.yaml
-EOF
-)
-
 echo "$control" > "$deb_package_directory/DEBIAN/control"
-echo "$conffiles" > "$deb_package_directory/DEBIAN/conffiles"
 cp "$target_directory/nenechi-cli" "$deb_package_directory/usr/bin/nenechi"
-cp -r examples/config.yaml "$deb_package_directory/etc/nenechi/config.yaml"
+cp examples/config.yaml "$deb_package_directory/usr/share/nenechi/config.yaml"
+cp examples/conf.d/*.yaml "$deb_package_directory/usr/share/nenechi/conf.d/"
 
 chmod +x "$deb_package_directory/usr/bin/nenechi"
 
