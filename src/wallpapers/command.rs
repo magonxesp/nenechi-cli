@@ -36,11 +36,7 @@ pub fn execute_wallpaper_command(command: WallpapersCommands) -> Result<(), Stri
     let ignore_patterns = config.ignore.clone();
     let directory = config.directory()?;
     let result = match command {
-        WallpapersCommands::Tidy => tidy(
-            config.tidy()?,
-            ignore_patterns,
-            directory,
-        ),
+        WallpapersCommands::Tidy => tidy(config.tidy()?, ignore_patterns, directory),
         WallpapersCommands::Index => index(ignore_patterns, directory),
         WallpapersCommands::CleanIndex => Err("Not implemented".into()),
     };
@@ -180,10 +176,7 @@ fn find_indexed_or_index(
     Ok(existing.unwrap())
 }
 
-fn index(
-    ignore_patterns: Vec<String>,
-    directory: &Path,
-) -> Result<(), Box<dyn Error>> {
+fn index(ignore_patterns: Vec<String>, directory: &Path) -> Result<(), Box<dyn Error>> {
     info!("indexing wallpapers for directory: {}", directory.display());
     let repository = WallpaperRepository::get_instance();
     let walker = walk_directory(ignore_patterns, directory)?;

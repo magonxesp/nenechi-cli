@@ -11,8 +11,7 @@ pub struct ImageDetails {
 
 impl ImageDetails {
     pub fn read_from_path(path: &Path) -> Result<Self, String> {
-        let metadata = image::open(path)
-            .map_err(|e| e.to_string())?;
+        let metadata = image::open(path).map_err(|e| e.to_string())?;
 
         Ok(Self {
             width: metadata.width(),

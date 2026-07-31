@@ -1,5 +1,5 @@
 use reqwest::blocking::RequestBuilder;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use crate::{Client, ClientError};
 
@@ -157,11 +157,33 @@ pub struct Statistics {
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct StatusStatistics {
-    pub watching: String,
-    pub completed: String,
-    pub on_hold: String,
-    pub dropped: String,
-    pub plan_to_watch: String,
+    #[serde(deserialize_with = "deserialize_numeric")]
+    pub watching: u64,
+    #[serde(deserialize_with = "deserialize_numeric")]
+    pub completed: u64,
+    #[serde(deserialize_with = "deserialize_numeric")]
+    pub on_hold: u64,
+    #[serde(deserialize_with = "deserialize_numeric")]
+    pub dropped: u64,
+    #[serde(deserialize_with = "deserialize_numeric")]
+    pub plan_to_watch: u64,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Numeric {
+    Number(u64),
+    String(String),
+}
+
+fn deserialize_numeric<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match Numeric::deserialize(deserializer)? {
+        Numeric::Number(value) => Ok(value),
+        Numeric::String(value) => value.parse().map_err(serde::de::Error::custom),
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -172,11 +194,11 @@ pub struct Paging {
 
 impl Client {
     pub fn get_anime(&self, anime_id: u64) -> Result<AnimeDetails, ClientError> {
-        let response = self
+        let request = self
             .get(&format!("anime/{anime_id}"))
-            .query(&[("fields", ANIME_DETAILS_FIELDS)])
-            .send()
-            .map_err(ClientError::Http)?
+            .query(&[("fields", ANIME_DETAILS_FIELDS)]);
+        let response = self
+            .try_send(request)?
             .error_for_status()
             .map_err(ClientError::Http)?;
 
@@ -184,10 +206,9 @@ impl Client {
     }
 
     pub fn search_anime(&self, name: &str) -> Result<AnimeSearchResponse, ClientError> {
+        let request = self.search_anime_request(name)?;
         let response = self
-            .search_anime_request(name)?
-            .send()
-            .map_err(ClientError::Http)?
+            .try_send(request)?
             .error_for_status()
             .map_err(ClientError::Http)?;
 
@@ -246,6 +267,26 @@ mod tests {
 
         assert_eq!(relation, RelationType::Other);
         assert_eq!(future_relation, RelationType::Other);
+    }
+
+    #[test]
+    fn status_statistics_accept_strings_and_numbers() {
+        let statistics: StatusStatistics = serde_json::from_str(
+            r#"{
+                "watching": 0,
+                "completed": "100",
+                "on_hold": "5",
+                "dropped": 3,
+                "plan_to_watch": "20"
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(statistics.watching, 0);
+        assert_eq!(statistics.completed, 100);
+        assert_eq!(statistics.on_hold, 5);
+        assert_eq!(statistics.dropped, 3);
+        assert_eq!(statistics.plan_to_watch, 20);
     }
 
     #[test]

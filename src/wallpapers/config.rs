@@ -18,7 +18,7 @@ pub struct WallpapersConfig {
     #[serde(default)]
     pub ignore: Vec<String>,
     #[serde(default)]
-    tidy: Option<TidyWallpapersConfig>
+    tidy: Option<TidyWallpapersConfig>,
 }
 
 impl Default for WallpapersConfig {
@@ -26,7 +26,7 @@ impl Default for WallpapersConfig {
         Self {
             directory: "".to_string(),
             ignore: vec![],
-            tidy: None
+            tidy: None,
         }
     }
 }
@@ -93,7 +93,7 @@ pub struct TidyWallpapersConfig {
     #[serde(default)]
     aspect_ratio_directory: String,
     #[serde(default)]
-    tags_directory: String
+    tags_directory: String,
 }
 
 impl TidyWallpapersConfig {
@@ -105,7 +105,10 @@ impl TidyWallpapersConfig {
         let path = Path::new(&self.aspect_ratio_directory);
 
         if path.exists() && !path.is_dir() {
-            return Err(format!("{} is not a directory", self.aspect_ratio_directory));
+            return Err(format!(
+                "{} is not a directory",
+                self.aspect_ratio_directory
+            ));
         }
 
         Ok(path)

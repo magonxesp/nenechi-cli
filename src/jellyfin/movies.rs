@@ -1,6 +1,5 @@
 use crate::fs::{sanitize_filename_component, sanitize_relative_path, symlink_file};
 use crate::jellyfin::config::{TargetConfig, TargetType};
-use log::warn;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -16,16 +15,7 @@ pub fn organize(target: &TargetConfig) -> Result<usize, Box<dyn Error>> {
 
     let mut links = 0;
     for entry in fs::read_dir(&target.source)? {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(error) => {
-                warn!(
-                    "failed reading a movie item in {}: {error}",
-                    target.source.display()
-                );
-                continue;
-            }
-        };
+        let entry = entry?;
         let path = entry.path();
 
         if path.is_symlink() || target.ignores(&path) {
@@ -33,21 +23,13 @@ pub fn organize(target: &TargetConfig) -> Result<usize, Box<dyn Error>> {
         }
         if path.is_file() {
             if target.includes(&path) {
-                match organize_standalone_movie(target, &path) {
-                    Ok(()) => links += 1,
-                    Err(error) => warn!("failed organizing movie item {}: {error}", path.display()),
-                }
+                organize_standalone_movie(target, &path)?;
+                links += 1;
             }
             continue;
         }
         if path.is_dir() {
-            match organize_movie_directory(target, &path) {
-                Ok(directory_links) => links += directory_links,
-                Err(error) => warn!(
-                    "failed organizing movie directory {}: {error}",
-                    path.display()
-                ),
-            }
+            links += organize_movie_directory(target, &path)?;
         }
     }
 
@@ -73,32 +55,15 @@ fn organize_movie_directory(
         .into_iter()
         .filter_entry(|entry| !target.ignores(entry.path()))
     {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(error) => {
-                warn!(
-                    "failed reading an item in movie directory {}: {error}",
-                    movie_directory.display()
-                );
-                continue;
-            }
-        };
+        let entry = entry?;
         if !entry.file_type().is_file() || !target.includes(entry.path()) {
             continue;
         }
 
-        let result = (|| {
-            let relative = sanitize_relative_path(entry.path().strip_prefix(movie_directory)?);
-            let destination = target.destination.join(&movie_name).join(relative);
-            create_link(entry.path(), &destination)
-        })();
-        match result {
-            Ok(()) => links += 1,
-            Err(error) => warn!(
-                "failed organizing movie item {}: {error}",
-                entry.path().display()
-            ),
-        }
+        let relative = sanitize_relative_path(entry.path().strip_prefix(movie_directory)?);
+        let destination = target.destination.join(&movie_name).join(relative);
+        create_link(entry.path(), &destination)?;
+        links += 1;
     }
 
     Ok(links)
@@ -165,16 +130,13 @@ mod tests {
     }
 
     #[test]
-    fn continues_with_the_next_movie_when_one_fails() {
+    fn stops_when_a_movie_filesystem_operation_fails() {
         let temporary = tempdir().unwrap();
         let source = temporary.path().join("source");
         let destination = temporary.path().join("destination");
         fs::create_dir(&source).unwrap();
         fs::create_dir(&destination).unwrap();
         fs::write(source.join("Broken.mkv"), b"broken").unwrap();
-        let working_movie = source.join("Working.mkv");
-        fs::write(&working_movie, b"working").unwrap();
-
         // This file prevents creation of the directory for Broken.mkv.
         fs::write(destination.join("Broken"), b"blocking file").unwrap();
 
@@ -188,10 +150,6 @@ mod tests {
             ignore: Vec::new(),
         };
 
-        assert_eq!(organize(&target).unwrap(), 1);
-        assert_eq!(
-            fs::read_link(destination.join("Working").join("Working.mkv")).unwrap(),
-            fs::canonicalize(working_movie).unwrap()
-        );
+        assert!(organize(&target).is_err());
     }
 }

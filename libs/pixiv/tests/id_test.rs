@@ -25,12 +25,10 @@ fn it_should_create_valid_illustration_id_from_path() {
 
 #[test]
 fn it_should_create_valid_illustration_id_from_path_with_size() {
-    let square_id = IllustrationId::from_path(
-        Path::new("resources/96912590_p0_square1200.jpg")
-    ).unwrap();
-    let master_id = IllustrationId::from_path(
-        Path::new("resources/96912590_p0_master1200.jpg")
-    ).unwrap();
+    let square_id =
+        IllustrationId::from_path(Path::new("resources/96912590_p0_square1200.jpg")).unwrap();
+    let master_id =
+        IllustrationId::from_path(Path::new("resources/96912590_p0_master1200.jpg")).unwrap();
 
     assert_eq!("96912590", square_id.value);
     assert_eq!("96912590", master_id.value);

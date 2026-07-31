@@ -6,21 +6,21 @@ use crate::response::verify_response_is_not_error;
 
 #[derive(Deserialize, Debug)]
 pub struct Urls {
-	pub mini:     String,
-	pub thumb:    String,
-	pub small:    String,
-	pub regular:  String,
-	pub original: String
+    pub mini: String,
+    pub thumb: String,
+    pub small: String,
+    pub regular: String,
+    pub original: String,
 }
 
 #[derive(Deserialize)]
 struct UrlsConfig {
-    urls: Urls
+    urls: Urls,
 }
 
 #[derive(Deserialize)]
 struct Response {
-    body: UrlsConfig
+    body: UrlsConfig,
 }
 
 pub fn fetch_image_urls(id: &IllustrationId) -> Result<Urls, String> {
@@ -32,8 +32,7 @@ pub fn fetch_image_urls(id: &IllustrationId) -> Result<Urls, String> {
     let json = http_get_json(url.as_str())?;
     verify_response_is_not_error(&json)?;
 
-    let response: Response = serde_json::from_str(json.as_str())
-        .map_err(|e|  e.to_string())?;
+    let response: Response = serde_json::from_str(json.as_str()).map_err(|e| e.to_string())?;
 
     Ok(response.body.urls)
 }

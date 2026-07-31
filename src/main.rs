@@ -2,15 +2,15 @@ mod commands;
 mod config;
 mod database;
 mod fs;
+mod jellyfin;
 mod logging;
 mod schema;
 mod wallpapers;
-mod jellyfin;
 
+use crate::config::CliConfig;
 use clap::Parser;
 use commands::{Commands, execute_command};
 use config::read_config;
-use crate::config::CliConfig;
 
 #[derive(Debug, Parser)]
 #[command(name = "nennechi-cli")]

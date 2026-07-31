@@ -7,7 +7,7 @@ use serde::Deserialize;
 #[derive(Deserialize, Default, Debug)]
 pub struct TagTranslation {
     #[serde(default)]
-    pub en: String
+    pub en: String,
 }
 
 #[derive(Deserialize, Default, Debug)]
@@ -23,17 +23,17 @@ pub struct Tag {
 #[derive(Deserialize, Default)]
 struct Tags {
     #[serde(default)]
-    tags: Vec<Tag>
+    tags: Vec<Tag>,
 }
 
 #[derive(Deserialize)]
 struct TagsConfig {
-    tags: Tags
+    tags: Tags,
 }
 
 #[derive(Deserialize)]
 struct Response {
-    body: TagsConfig
+    body: TagsConfig,
 }
 
 pub fn fetch_tags(id: &IllustrationId) -> Result<Vec<Tag>, String> {
@@ -42,13 +42,15 @@ pub fn fetch_tags(id: &IllustrationId) -> Result<Vec<Tag>, String> {
         id = id.value
     );
 
-    debug!("requesting tags for illustration with id {}: {}", id.value, url);
+    debug!(
+        "requesting tags for illustration with id {}: {}",
+        id.value, url
+    );
 
     let json = http_get_json(url.as_str())?;
     verify_response_is_not_error(&json)?;
 
-    let response: Response = serde_json::from_str(json.as_str())
-        .map_err(|e|  e.to_string())?;
+    let response: Response = serde_json::from_str(json.as_str()).map_err(|e| e.to_string())?;
 
     Ok(response.body.tags.tags)
 }

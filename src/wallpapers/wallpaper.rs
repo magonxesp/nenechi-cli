@@ -64,7 +64,9 @@ pub struct WallpaperRepository {
 
 impl WallpaperRepository {
     pub fn new(connection_pool: &DatabasePool) -> Self {
-        Self { connection_pool: connection_pool.clone() }
+        Self {
+            connection_pool: connection_pool.clone(),
+        }
     }
 
     pub fn get_instance<'a>() -> &'a Self {
