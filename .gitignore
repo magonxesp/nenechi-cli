@@ -7,9 +7,8 @@ config.*.yml
 *.db
 .idea
 sqlite
-docker-compose.yml
-docker-compose.*.yml
 .version
+/sandbox
 
 # for testing
 wallpapers

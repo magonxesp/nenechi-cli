@@ -1,4 +1,9 @@
 /target
+/media
+/sandbox
+.git
+.env
+.DS_Store
 *.log
 config.yml
 config.*.yml

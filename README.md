@@ -120,3 +120,39 @@ pruebas. Para ejecutar todos los tests:
 ```bash
 cargo test --workspace
 ```
+
+## Probar Debian desde macOS
+
+Los servicios de `docker-compose.yml` permiten generar el paquete Linux,
+instalarlo en un Debian desechable y probar la imagen de la aplicación desde
+macOS u otro sistema con Docker Compose.
+
+Prepara la configuración compartida por los contenedores:
+
+```bash
+make sandbox
+```
+
+Los ejemplos se copian a `sandbox/home/.config/nenechi`. Puedes editar esas
+copias para usar rutas y credenciales de prueba; las siguientes ejecuciones de
+`make sandbox` no sobrescriben tus cambios.
+
+Genera el paquete Debian:
+
+```bash
+docker compose run --rm packager
+```
+
+El paquete se guarda en `target/release/bundle` y usa la arquitectura del
+contenedor. Instálalo y comprueba el ejecutable en un Debian limpio con:
+
+```bash
+docker compose run --rm sandbox bash -lc \
+  'dpkg --install target/release/bundle/nenechi_*.deb && nenechi --help'
+```
+
+Para probar directamente la imagen definida en `Dockerfile`:
+
+```bash
+docker compose run --rm nenechi_cli --help
+```

@@ -1,0 +1,23 @@
+services:
+  packager:
+    image: rust:latest
+    working_dir: /src
+    command: ["make", "deb"]
+    volumes:
+      - ./:/src
+
+  # For testing the Debian package installation.
+  sandbox:
+    image: magonx/debian:latest
+    working_dir: /src
+    command: ["/bin/bash"]
+    volumes:
+      - ./sandbox/home:/root
+      - ./:/src
+
+  # For testing the application image.
+  nenechi:
+    build: .
+    working_dir: /src
+    volumes:
+      - ./sandbox/home:/root
