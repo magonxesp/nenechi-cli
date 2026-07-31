@@ -8,8 +8,6 @@ use nenechi_myanimelist::{Anime, AnimeDetails, Client, RelationType};
 use crate::jellyfin::config::SeriesCategory;
 use crate::jellyfin::series::{ResolvedSeriesMetadata, SeriesMetadataResolver};
 
-const TV_MEDIA_TYPE: &str = "tv";
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AnimeRecord {
     pub id: u64,
@@ -61,7 +59,6 @@ impl From<AnimeDetails> for AnimeRecord {
 pub enum AnimeResolverError {
     EmptyTitle,
     AnimeNotFound(String),
-    NoTvAnimeFound(String),
     AmbiguousAnimeTitle {
         title: String,
         candidates: Vec<String>,
@@ -82,13 +79,9 @@ impl Display for AnimeResolverError {
                     "MyAnimeList no encontró resultados para {title:?}"
                 )
             }
-            Self::NoTvAnimeFound(title) => write!(
-                formatter,
-                "MyAnimeList no encontró una entrada de tipo TV para {title:?}"
-            ),
             Self::AmbiguousAnimeTitle { title, candidates } => write!(
                 formatter,
-                "MyAnimeList devolvió varias entradas de tipo TV para {title:?} sin una coincidencia exacta: {}",
+                "MyAnimeList devolvió varias entradas para {title:?} sin una coincidencia exacta: {}",
                 candidates.join(", ")
             ),
             Self::NotAnimeCategory => {
@@ -100,7 +93,7 @@ impl Display for AnimeResolverError {
             ),
             Self::AnimeOutsideMainSequence(anime_id) => write!(
                 formatter,
-                "el anime {anime_id} no pertenece a la secuencia principal de secuelas TV"
+                "el anime {anime_id} no pertenece a la secuencia principal de secuelas"
             ),
             Self::Catalog(error) => write!(formatter, "error consultando MyAnimeList: {error}"),
         }
@@ -187,13 +180,10 @@ impl AnimeResolver {
         cache: &mut HashMap<u64, AnimeRecord>,
     ) -> Result<AnimeRecord, AnimeResolverError> {
         results.sort_by_key(|result| !same_title(&result.title, query));
-        let mut tv_candidates = Vec::new();
+        let mut candidates = Vec::new();
 
         for result in results {
             let anime = self.get_cached(result.id, cache)?;
-            if !is_tv(&anime) {
-                continue;
-            }
             if same_title(&anime.title, query)
                 || anime
                     .alternative_titles
@@ -202,15 +192,14 @@ impl AnimeResolver {
             {
                 return Ok(anime);
             }
-            tv_candidates.push(anime);
+            candidates.push(anime);
         }
 
-        match tv_candidates.len() {
-            0 => Err(AnimeResolverError::NoTvAnimeFound(query.into())),
-            1 => Ok(tv_candidates.pop().unwrap()),
+        match candidates.len() {
+            1 => Ok(candidates.pop().unwrap()),
             _ => Err(AnimeResolverError::AmbiguousAnimeTitle {
                 title: query.into(),
-                candidates: tv_candidates
+                candidates: candidates
                     .into_iter()
                     .map(|anime| format!("{} ({})", anime.title, anime.id))
                     .collect(),
@@ -230,7 +219,7 @@ impl AnimeResolver {
                 return Err(AnimeResolverError::RelationCycle(anime.id));
             }
 
-            let candidates = self.tv_relations(&anime.prequel_ids, cache)?;
+            let candidates = self.relations(&anime.prequel_ids, cache)?;
             let Some(prequel) = select_previous(&anime, candidates) else {
                 return Ok(anime);
             };
@@ -258,7 +247,7 @@ impl AnimeResolver {
                 start_date: anime.start_date.clone(),
             });
 
-            let candidates = self.tv_relations(&anime.sequel_ids, cache)?;
+            let candidates = self.relations(&anime.sequel_ids, cache)?;
             let Some(sequel) = select_next(&anime, candidates) else {
                 return Ok(seasons);
             };
@@ -266,7 +255,7 @@ impl AnimeResolver {
         }
     }
 
-    fn tv_relations(
+    fn relations(
         &self,
         anime_ids: &[u64],
         cache: &mut HashMap<u64, AnimeRecord>,
@@ -279,9 +268,7 @@ impl AnimeResolver {
                 continue;
             }
             let related = self.get_cached(*anime_id, cache)?;
-            if is_tv(&related) {
-                anime.push(related);
-            }
+            anime.push(related);
         }
 
         Ok(anime)
@@ -323,10 +310,6 @@ impl SeriesMetadataResolver for AnimeResolver {
         self.resolve_title(title)
             .map_err(|error| Box::new(error) as Box<dyn Error>)
     }
-}
-
-fn is_tv(anime: &AnimeRecord) -> bool {
-    anime.media_type.eq_ignore_ascii_case(TV_MEDIA_TYPE)
 }
 
 fn same_title(left: &str, right: &str) -> bool {
@@ -451,12 +434,12 @@ mod tests {
     }
 
     #[test]
-    fn ignores_related_anime_that_are_not_tv() {
+    fn follows_related_anime_regardless_of_media_type() {
         let (resolver, mut cache) = resolver(vec![
             anime(1, "Example Movie", "movie", "2019-01-01", &[], &[2]),
-            anime(2, "Example", "tv", "2020-01-01", &[1], &[3, 4]),
-            anime(3, "Example OVA", "ova", "2020-06-01", &[2], &[]),
-            anime(4, "Example 2", "tv", "2021-01-01", &[2], &[]),
+            anime(2, "Example", "tv", "2020-01-01", &[1], &[3]),
+            anime(3, "Example OVA", "ova", "2020-06-01", &[2], &[4]),
+            anime(4, "Example ONA", "ona", "2021-01-01", &[3], &[]),
         ]);
 
         let (_, seasons) = resolve_from_cache(&resolver, 2, &mut cache).unwrap();
@@ -465,12 +448,35 @@ mod tests {
                 .iter()
                 .map(|season| season.anime_id)
                 .collect::<Vec<_>>(),
-            vec![2, 4]
+            vec![1, 2, 3, 4]
         );
     }
 
     #[test]
-    fn chooses_the_closest_later_tv_sequel_by_air_date() {
+    fn selects_an_exact_movie_title() {
+        let (resolver, mut cache) = resolver(vec![anime(
+            1,
+            "Example Movie",
+            "movie",
+            "2020-01-01",
+            &[],
+            &[],
+        )]);
+        let results = vec![Anime {
+            id: 1,
+            title: "Example Movie".into(),
+            main_picture: None,
+        }];
+
+        let selected = resolver
+            .select_search_result("example movie", results, &mut cache)
+            .unwrap();
+
+        assert_eq!(selected.id, 1);
+    }
+
+    #[test]
+    fn chooses_the_closest_later_sequel_by_air_date() {
         let (resolver, mut cache) = resolver(vec![
             anime(1, "Example", "tv", "2020-01-01", &[], &[3, 2]),
             anime(2, "Example 2", "tv", "2021-01-01", &[1], &[3]),
