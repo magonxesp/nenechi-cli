@@ -122,6 +122,12 @@ impl SeriesMetadataRepository {
 
         diesel::insert_into(series_metadata::table)
             .values(&table_model)
+            .on_conflict(series_metadata::path)
+            .do_update()
+            .set((
+                series_metadata::title.eq(&table_model.title),
+                series_metadata::season.eq(table_model.season),
+            ))
             .execute(&mut connection)?;
         Ok(())
     }

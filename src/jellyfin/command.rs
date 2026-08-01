@@ -1,5 +1,3 @@
-use crate::anime::CachedAnimeRepository;
-use crate::config::{CliConfig, MyAnimeListConfig};
 use crate::jellyfin::anime::AnimeResolver;
 use crate::jellyfin::config::{JellyfinConfig, SeriesCategory, TargetConfig, TargetType};
 use crate::jellyfin::series::{ResolvedSeriesMetadata, SeriesMetadataResolver};
@@ -7,7 +5,6 @@ use crate::jellyfin::series_metadata::{SeriesMetadata, SeriesMetadataRepository}
 use crate::jellyfin::{movies, series};
 use clap::Subcommand;
 use log::{debug, info, warn};
-use nenechi_myanimelist::Client;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::fs;
@@ -15,14 +12,17 @@ use std::path::Path;
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum JellyfinCommands {
-    Index,
+    Index {
+        #[arg(long)]
+        force: bool,
+    },
     Mount,
 }
 
 impl Display for JellyfinCommands {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Index => formatter.write_str("index"),
+            Self::Index { .. } => formatter.write_str("index"),
             Self::Mount => formatter.write_str("mount"),
         }
     }
@@ -32,12 +32,13 @@ pub fn execute_jellyfin_command(command: JellyfinCommands) -> Result<(), String>
     let config = JellyfinConfig::read()?;
     let anime_resolver = anime_resolver(&config)?;
     let result = match command {
-        JellyfinCommands::Index => index(
+        JellyfinCommands::Index { force } => index(
             &config,
             SeriesMetadataRepository::get_instance(),
             anime_resolver
                 .as_ref()
                 .map(|resolver| resolver as &dyn SeriesMetadataResolver),
+            force,
         ),
         JellyfinCommands::Mount => mount(
             &config,
@@ -57,6 +58,7 @@ fn index(
     config: &JellyfinConfig,
     repository: &SeriesMetadataRepository,
     anime_resolver: Option<&dyn SeriesMetadataResolver>,
+    force: bool,
 ) -> Result<usize, Box<dyn Error>> {
     let mut indexed = 0;
 
@@ -65,13 +67,13 @@ fn index(
         .iter()
         .filter(|target| target.target_type == TargetType::Series)
     {
-        match index_target(target, repository, anime_resolver) {
+        match index_target(target, repository, anime_resolver, force) {
             Ok(target_indexed) => indexed += target_indexed,
             Err(error) => warn!("failed indexing Jellyfin target {:?}: {error}", target.name),
         }
     }
 
-    info!("finished Jellyfin series index: {indexed} new series");
+    info!("finished Jellyfin series index: {indexed} indexed series");
     Ok(indexed)
 }
 
@@ -79,6 +81,7 @@ fn index_target(
     target: &TargetConfig,
     repository: &SeriesMetadataRepository,
     anime_resolver: Option<&dyn SeriesMetadataResolver>,
+    force: bool,
 ) -> Result<usize, Box<dyn Error>> {
     target.validate_source()?;
     let series_config = target.series.as_ref().ok_or_else(|| {
@@ -111,6 +114,7 @@ fn index_target(
             &series_config.category,
             repository,
             anime_resolver,
+            force,
         ) {
             Ok(true) => {
                 indexed += 1;
@@ -133,8 +137,9 @@ fn index_series_directory(
     category: &SeriesCategory,
     repository: &SeriesMetadataRepository,
     anime_resolver: Option<&dyn SeriesMetadataResolver>,
+    force: bool,
 ) -> Result<bool, Box<dyn Error>> {
-    find_indexed_or_index_series_directory(directory, category, repository, anime_resolver)
+    find_indexed_or_index_series_directory(directory, category, repository, anime_resolver, force)
         .map(|(_, indexed)| indexed)
 }
 
@@ -143,17 +148,19 @@ fn find_indexed_or_index_series_directory(
     category: &SeriesCategory,
     repository: &SeriesMetadataRepository,
     anime_resolver: Option<&dyn SeriesMetadataResolver>,
+    force: bool,
 ) -> Result<(SeriesMetadata, bool), Box<dyn Error>> {
     let directory = fs::canonicalize(directory)?;
     let path = directory
         .to_str()
         .ok_or_else(|| format!("series path {} is not valid UTF-8", directory.display()))?;
-    if let Some(metadata) = repository.find_by_path(path)? {
+    let indexed_metadata = repository.find_by_path(path)?;
+    if let Some(metadata) = indexed_metadata.as_ref().filter(|_| !force) {
         debug!("series already indexed: {}", directory.display());
-        return Ok((metadata, false));
+        return Ok((metadata.clone(), false));
     }
 
-    let metadata = match category {
+    let mut metadata = match category {
         SeriesCategory::Anime => {
             let resolver = anime_resolver
                 .ok_or("myanimelist.api_key is required to index an anime Jellyfin target")?;
@@ -162,6 +169,9 @@ fn find_indexed_or_index_series_directory(
         }
         _ => SeriesMetadata::from_directory(&directory, None)?,
     };
+    if let Some(indexed_metadata) = indexed_metadata {
+        metadata.id = indexed_metadata.id;
+    }
     repository.save(&metadata)?;
 
     Ok((metadata, true))
@@ -183,6 +193,7 @@ impl SeriesMetadataResolver for IndexedSeriesMetadataResolver<'_> {
             category,
             self.repository,
             self.anime_resolver,
+            false,
         )?;
         if indexed {
             info!(
@@ -289,8 +300,8 @@ mod tests {
         };
         let repository = SeriesMetadataRepository::new(test_db_connection());
 
-        assert_eq!(index(&config, &repository, None).unwrap(), 2);
-        assert_eq!(index(&config, &repository, None).unwrap(), 0);
+        assert_eq!(index(&config, &repository, None, false).unwrap(), 2);
+        assert_eq!(index(&config, &repository, None, false).unwrap(), 0);
 
         let canonical_path = fs::canonicalize(&series_directory).unwrap();
         let metadata = repository
@@ -363,6 +374,22 @@ mod tests {
         }
     }
 
+    struct UpdatedAnimeResolver;
+
+    impl SeriesMetadataResolver for UpdatedAnimeResolver {
+        fn resolve(
+            &self,
+            _source_directory: &Path,
+            category: &SeriesCategory,
+        ) -> Result<ResolvedSeriesMetadata, Box<dyn Error>> {
+            assert_eq!(category, &SeriesCategory::Anime);
+            Ok(ResolvedSeriesMetadata {
+                title: "Updated Anime Title".into(),
+                season: 4,
+            })
+        }
+    }
+
     #[test]
     #[serial]
     fn resolves_anime_title_and_season_before_indexing() {
@@ -394,7 +421,7 @@ mod tests {
         let repository = SeriesMetadataRepository::new(test_db_connection());
 
         assert_eq!(
-            index(&config, &repository, Some(&FixedAnimeResolver)).unwrap(),
+            index(&config, &repository, Some(&FixedAnimeResolver), false,).unwrap(),
             1
         );
 
@@ -405,6 +432,53 @@ mod tests {
             .unwrap();
         assert_eq!(metadata.title, "Canonical Anime Title");
         assert_eq!(metadata.season, 3);
+    }
+
+    #[test]
+    #[serial]
+    fn force_reindexes_and_updates_an_existing_series() {
+        let temporary = tempdir().unwrap();
+        let source = temporary.path().join("source");
+        let series_directory = source.join("Downloaded Anime Title");
+        fs::create_dir_all(&series_directory).unwrap();
+
+        let config = JellyfinConfig {
+            targets: vec![TargetConfig {
+                name: "anime".into(),
+                target_type: TargetType::Series,
+                source,
+                destination: temporary.path().join("destination"),
+                series: Some(SeriesConfig {
+                    category: SeriesCategory::Anime,
+                    episode: EpisodeConfig {
+                        patterns: Vec::new(),
+                        fallback: EpisodeFallback::FilesystemOrder,
+                        start_at: 1,
+                    },
+                }),
+                include: vec!["*.mkv".into()],
+                ignore: Vec::new(),
+            }],
+        };
+        let repository = SeriesMetadataRepository::new(test_db_connection());
+        let canonical_path = fs::canonicalize(&series_directory).unwrap();
+        let path = canonical_path.to_str().unwrap();
+        let original = SeriesMetadata::new("Old Anime Title".into(), path.into(), Some(1)).unwrap();
+        repository.save(&original).unwrap();
+
+        assert_eq!(
+            index(&config, &repository, Some(&UnexpectedAnimeResolver), false,).unwrap(),
+            0
+        );
+        assert_eq!(
+            index(&config, &repository, Some(&UpdatedAnimeResolver), true,).unwrap(),
+            1
+        );
+
+        let updated = repository.find_by_path(path).unwrap().unwrap();
+        assert_eq!(updated.id, original.id);
+        assert_eq!(updated.title, "Updated Anime Title");
+        assert_eq!(updated.season, 4);
     }
 
     #[test]
@@ -440,7 +514,7 @@ mod tests {
         let repository = SeriesMetadataRepository::new(test_db_connection());
 
         assert_eq!(
-            index(&config, &repository, Some(&SelectiveAnimeResolver)).unwrap(),
+            index(&config, &repository, Some(&SelectiveAnimeResolver), false,).unwrap(),
             1
         );
 
@@ -503,7 +577,7 @@ mod tests {
         };
         let repository = SeriesMetadataRepository::new(test_db_connection());
 
-        assert_eq!(index(&config, &repository, None).unwrap(), 1);
+        assert_eq!(index(&config, &repository, None, false).unwrap(), 1);
 
         let path = fs::canonicalize(series_directory).unwrap();
         assert!(
