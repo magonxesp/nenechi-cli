@@ -1,12 +1,13 @@
 use log::{debug, info, warn};
-use reqwest::{Method, StatusCode};
 use reqwest::blocking::{RequestBuilder, Response};
 use reqwest::header::{HeaderValue, InvalidHeaderValue};
+use reqwest::{Method, StatusCode};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::io::ErrorKind;
 
 const API_BASE_URL: &str = "https://api.myanimelist.net/v2";
+const WEB_BASE_URL: &str = "https://myanimelist.net";
 const CLIENT_ID_HEADER: &str = "X-MAL-CLIENT-ID";
 const MAX_RETRIES: u64 = 3;
 
@@ -23,7 +24,7 @@ impl Client {
         }
 
         let api_key = HeaderValue::from_str(api_key.as_ref())
-                .map_err(|err| ClientError::InvalidApiKey(err.to_string()))?;
+            .map_err(|err| ClientError::InvalidApiKey(err.to_string()))?;
 
         let http = reqwest::blocking::Client::builder()
             .build()
@@ -34,6 +35,11 @@ impl Client {
 
     pub fn get(&self, path: &str) -> RequestBuilder {
         self.request(Method::GET, path)
+    }
+
+    pub(crate) fn web_get(&self, path: &str) -> RequestBuilder {
+        let url = format!("{WEB_BASE_URL}/{}", path.trim_start_matches('/'));
+        self.http.get(url)
     }
 
     pub fn request(&self, method: Method, path: &str) -> RequestBuilder {
@@ -97,10 +103,12 @@ impl Client {
 
         match status {
             StatusCode::FORBIDDEN => Err(ClientError::InvalidApiKey(format!(
-                "{} (expired access tokens or invalid access tokens)", status
+                "{} (expired access tokens or invalid access tokens)",
+                status
             ))),
             StatusCode::BAD_REQUEST => Err(ClientError::Http(format!(
-                "{} (invalid parameters)", status
+                "{} (invalid parameters)",
+                status
             ))),
             _ => {
                 if status.is_server_error() {
@@ -122,7 +130,7 @@ pub enum ClientError {
     RequestNotCloneable,
     InvalidApiKey(String),
     Http(String),
-    Other(String)
+    Other(String),
 }
 
 impl Display for ClientError {
@@ -134,7 +142,10 @@ impl Display for ClientError {
             }
             Self::RequestNotCloneable => write!(formatter, "request not cloneable"),
             Self::InvalidApiKey(message) => write!(formatter, "API key no válida: {message}"),
-            Self::Http(message) => write!(formatter, "la peticion HTTP ha respondido con status: {message}"),
+            Self::Http(message) => write!(
+                formatter,
+                "la peticion HTTP ha respondido con status: {message}"
+            ),
             Self::Other(message) => write!(formatter, "error en el cliente HTTP: {message}"),
         }
     }

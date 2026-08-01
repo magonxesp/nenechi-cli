@@ -13,11 +13,11 @@ pub struct SeriesMetadata {
     pub id: String,
     pub title: String,
     pub path: String,
-    pub season: u32,
+    pub season: i64,
 }
 
 impl SeriesMetadata {
-    pub fn new(title: String, path: String, season: Option<u32>) -> Result<Self, Box<dyn Error>> {
+    pub fn new(title: String, path: String, season: Option<i64>) -> Result<Self, Box<dyn Error>> {
         let title = title.trim().to_string();
         if title.is_empty() {
             return Err("series title cannot be empty".into());
@@ -39,7 +39,7 @@ impl SeriesMetadata {
         })
     }
 
-    pub fn from_directory(path: &Path, season: Option<u32>) -> Result<Self, Box<dyn Error>> {
+    pub fn from_directory(path: &Path, season: Option<i64>) -> Result<Self, Box<dyn Error>> {
         let title = path
             .file_name()
             .ok_or_else(|| format!("series path {} has no directory name", path.display()))?
@@ -86,7 +86,7 @@ impl TryFrom<SeriesMetadataTable> for SeriesMetadata {
             id: value.id,
             title: value.title,
             path: value.path,
-            season: u32::try_from(value.season)?,
+            season: i64::try_from(value.season)?,
         })
     }
 }

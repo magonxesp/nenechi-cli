@@ -1,12 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use crate::anime::{AnimeRepository, AnimeRepositoryError, CachedAnimeRepository};
+use crate::jellyfin::config::SeriesCategory;
+use crate::jellyfin::series::{ResolvedSeriesMetadata, SeriesMetadataResolver};
+use log::debug;
+use nenechi_myanimelist::{AnimeDetails, MediaType, RelationType};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::path::Path;
-
-use nenechi_myanimelist::{Anime, AnimeDetails, Client, RelationType};
-
-use crate::jellyfin::config::SeriesCategory;
-use crate::jellyfin::series::{ResolvedSeriesMetadata, SeriesMetadataResolver};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AnimeRecord {
@@ -47,7 +46,7 @@ impl From<AnimeDetails> for AnimeRecord {
             id: anime.id,
             title: anime.title,
             alternative_titles,
-            media_type: anime.media_type,
+            media_type: anime.media_type.to_string(),
             start_date: anime.start_date,
             prequel_ids,
             sequel_ids,
@@ -59,14 +58,9 @@ impl From<AnimeDetails> for AnimeRecord {
 pub enum AnimeResolverError {
     EmptyTitle,
     AnimeNotFound(String),
-    AmbiguousAnimeTitle {
-        title: String,
-        candidates: Vec<String>,
-    },
+    SeasonNotFound,
     NotAnimeCategory,
-    RelationCycle(u64),
-    AnimeOutsideMainSequence(u64),
-    Catalog(String),
+    Other(String),
 }
 
 impl Display for AnimeResolverError {
@@ -79,221 +73,185 @@ impl Display for AnimeResolverError {
                     "MyAnimeList no encontró resultados para {title:?}"
                 )
             }
-            Self::AmbiguousAnimeTitle { title, candidates } => write!(
-                formatter,
-                "MyAnimeList devolvió varias entradas para {title:?} sin una coincidencia exacta: {}",
-                candidates.join(", ")
-            ),
             Self::NotAnimeCategory => {
                 formatter.write_str("el resolver de anime solo admite la categoría anime")
             }
-            Self::RelationCycle(anime_id) => write!(
-                formatter,
-                "se detectó un ciclo en las relaciones de MyAnimeList para el anime {anime_id}"
-            ),
-            Self::AnimeOutsideMainSequence(anime_id) => write!(
-                formatter,
-                "el anime {anime_id} no pertenece a la secuencia principal de secuelas"
-            ),
-            Self::Catalog(error) => write!(formatter, "error consultando MyAnimeList: {error}"),
+            Self::Other(error) => write!(formatter, "{error}"),
+            Self::SeasonNotFound => write!(formatter, "season not found"),
         }
     }
 }
 
 impl Error for AnimeResolverError {}
 
-pub struct AnimeResolver {
-    client: Client,
+impl From<AnimeRepositoryError> for AnimeResolverError {
+    fn from(error: AnimeRepositoryError) -> Self {
+        AnimeResolverError::Other(error.to_string())
+    }
 }
 
-impl AnimeResolver {
-    pub fn new(client: Client) -> Self {
-        Self { client }
+struct AnimeSeasonResolver<R>
+where
+    R: AnimeRepository,
+{
+    repository: R,
+}
+
+impl<R> AnimeSeasonResolver<R>
+where
+    R: AnimeRepository,
+{
+    pub fn new(repository: R) -> Self {
+        Self { repository }
     }
 
-    pub fn resolve_title(&self, title: &str) -> Result<ResolvedSeriesMetadata, AnimeResolverError> {
-        let (target_id, seasons) = self.resolve_seasons(title)?;
-        let target = seasons
-            .iter()
-            .find(|anime| anime.anime_id == target_id)
-            .ok_or(AnimeResolverError::AnimeOutsideMainSequence(target_id))?;
-        let series_title = seasons
-            .first()
-            .expect("resolve_seasons siempre devuelve al menos una temporada")
-            .title
-            .clone();
+    pub fn resolve(&self, anime_id: u64) -> Result<Option<i64>, AnimeResolverError> {
+        let mut season = 1;
+        let mut current_anime_id = anime_id;
 
-        Ok(ResolvedSeriesMetadata {
-            title: series_title,
-            season: target.season,
-        })
-    }
-
-    pub fn seasons(&self, title: &str) -> Result<Vec<AnimeSeason>, AnimeResolverError> {
-        self.resolve_seasons(title).map(|(_, seasons)| seasons)
-    }
-
-    fn resolve_seasons(&self, title: &str) -> Result<(u64, Vec<AnimeSeason>), AnimeResolverError> {
-        let title = title.trim();
-        if title.is_empty() {
-            return Err(AnimeResolverError::EmptyTitle);
-        }
-
-        let search_response = self
-            .client
-            .search_anime(title)
-            .map_err(|error| AnimeResolverError::Catalog(error.to_string()))?;
-        let search_results = search_response
-            .data
-            .into_iter()
-            .map(|entry| entry.node)
-            .collect::<Vec<_>>();
-        if search_results.is_empty() {
-            return Err(AnimeResolverError::AnimeNotFound(title.into()));
-        }
-
-        let mut cache = HashMap::new();
-        let target = self.select_search_result(title, search_results, &mut cache)?;
-        self.resolve_target(target, &mut cache)
-    }
-
-    fn resolve_target(
-        &self,
-        target: AnimeRecord,
-        cache: &mut HashMap<u64, AnimeRecord>,
-    ) -> Result<(u64, Vec<AnimeSeason>), AnimeResolverError> {
-        let target_id = target.id;
-        let root = self.find_root(target, cache)?;
-        let seasons = self.follow_sequels(root, cache)?;
-
-        if !seasons.iter().any(|anime| anime.anime_id == target_id) {
-            return Err(AnimeResolverError::AnimeOutsideMainSequence(target_id));
-        }
-
-        Ok((target_id, seasons))
-    }
-
-    fn select_search_result(
-        &self,
-        query: &str,
-        mut results: Vec<Anime>,
-        cache: &mut HashMap<u64, AnimeRecord>,
-    ) -> Result<AnimeRecord, AnimeResolverError> {
-        results.sort_by_key(|result| !same_title(&result.title, query));
-        let mut candidates = Vec::new();
-
-        for result in results {
-            let anime = self.get_cached(result.id, cache)?;
-            if same_title(&anime.title, query)
-                || anime
-                    .alternative_titles
-                    .iter()
-                    .any(|title| same_title(title, query))
-            {
-                return Ok(anime);
+        while let Some(prequel) = self.resolve_prequel(current_anime_id)? {
+            if prequel.media_type == MediaType::Tv {
+                season += 1;
             }
-            candidates.push(anime);
+            current_anime_id = prequel.id;
         }
 
-        match candidates.len() {
-            1 => Ok(candidates.pop().unwrap()),
-            _ => Err(AnimeResolverError::AmbiguousAnimeTitle {
-                title: query.into(),
-                candidates: candidates
-                    .into_iter()
-                    .map(|anime| format!("{} ({})", anime.title, anime.id))
-                    .collect(),
-            }),
-        }
+        Ok(Some(season))
     }
 
-    fn find_root(
-        &self,
-        mut anime: AnimeRecord,
-        cache: &mut HashMap<u64, AnimeRecord>,
-    ) -> Result<AnimeRecord, AnimeResolverError> {
-        let mut visited = HashSet::new();
+    fn resolve_prequel(&self, anime_id: u64) -> Result<Option<AnimeDetails>, AnimeResolverError> {
+        let anime = match self.repository.find_by_id(anime_id)? {
+            Some(anime) => anime,
+            None => return Ok(None),
+        };
 
-        loop {
-            if !visited.insert(anime.id) {
-                return Err(AnimeResolverError::RelationCycle(anime.id));
+        for related in &anime.related_anime {
+            if related.relation_type == RelationType::Prequel {
+                if let Some(details) = self.repository.find_by_id(related.node.id)? {
+                    return Ok(Some(details.clone()));
+                }
             }
-
-            let candidates = self.relations(&anime.prequel_ids, cache)?;
-            let Some(prequel) = select_previous(&anime, candidates) else {
-                return Ok(anime);
-            };
-            anime = prequel;
         }
+
+        Ok(None)
+    }
+}
+
+struct AnimeTitleResolver<R>
+where
+    R: AnimeRepository,
+{
+    repository: R,
+}
+
+impl<R> AnimeTitleResolver<R>
+where
+    R: AnimeRepository,
+{
+    pub fn new(repository: R) -> Self {
+        Self { repository }
     }
 
-    fn follow_sequels(
-        &self,
-        mut anime: AnimeRecord,
-        cache: &mut HashMap<u64, AnimeRecord>,
-    ) -> Result<Vec<AnimeSeason>, AnimeResolverError> {
-        let mut visited = HashSet::new();
-        let mut seasons = Vec::new();
+    pub fn resolve(&self, title: &str) -> Result<Option<AnimeDetails>, AnimeResolverError> {
+        let search_results = self.repository.search(title)?;
 
-        loop {
-            if !visited.insert(anime.id) {
-                return Err(AnimeResolverError::RelationCycle(anime.id));
-            }
-
-            seasons.push(AnimeSeason {
-                anime_id: anime.id,
-                title: anime.title.clone(),
-                season: seasons.len() as u32 + 1,
-                start_date: anime.start_date.clone(),
-            });
-
-            let candidates = self.relations(&anime.sequel_ids, cache)?;
-            let Some(sequel) = select_next(&anime, candidates) else {
-                return Ok(seasons);
-            };
-            anime = sequel;
-        }
-    }
-
-    fn relations(
-        &self,
-        anime_ids: &[u64],
-        cache: &mut HashMap<u64, AnimeRecord>,
-    ) -> Result<Vec<AnimeRecord>, AnimeResolverError> {
-        let mut seen = HashSet::new();
-        let mut anime = Vec::new();
-
-        for anime_id in anime_ids {
-            if !seen.insert(*anime_id) {
+        for result in search_results {
+            let details = self.repository.find_by_id(result.id)?;
+            if details.is_none() {
                 continue;
             }
-            let related = self.get_cached(*anime_id, cache)?;
-            anime.push(related);
+
+            let details = details.unwrap();
+            let mut titles: Vec<&str> = Vec::new();
+
+            titles.push(&details.title);
+            if let Some(en) = &details.alternative_titles.en {
+                titles.push(en);
+            }
+
+            if let Some(ja) = &details.alternative_titles.ja {
+                titles.push(ja);
+            }
+
+            for synonym in &details.alternative_titles.synonyms {
+                titles.push(synonym);
+            }
+
+            for &found_title in &titles {
+                if same_title(found_title, title) {
+                    debug!(
+                        "{} coincide con {}, devolviendo los detalles de {}",
+                        title, found_title, details.id
+                    );
+
+                    return Ok(Some(details.clone()));
+                }
+            }
+
+            debug!(
+                "{:?} no coincide con uno de los items de la busqueda: {:?}",
+                title, titles
+            );
         }
 
-        Ok(anime)
-    }
-
-    fn get_cached(
-        &self,
-        anime_id: u64,
-        cache: &mut HashMap<u64, AnimeRecord>,
-    ) -> Result<AnimeRecord, AnimeResolverError> {
-        if let Some(anime) = cache.get(&anime_id) {
-            return Ok(anime.clone());
-        }
-
-        let anime = self
-            .client
-            .get_anime(anime_id)
-            .map_err(|error| AnimeResolverError::Catalog(error.to_string()))?;
-        let anime: AnimeRecord = anime.into();
-        cache.insert(anime_id, anime.clone());
-        Ok(anime)
+        Ok(None)
     }
 }
 
-impl SeriesMetadataResolver for AnimeResolver {
+pub struct AnimeResolver<R>
+where
+    R: AnimeRepository,
+{
+    season_resolver: AnimeSeasonResolver<R>,
+    title_resolver: AnimeTitleResolver<R>,
+}
+
+impl AnimeResolver<CachedAnimeRepository> {
+    pub fn build() -> Result<Self, AnimeResolverError> {
+        Ok(Self::new(CachedAnimeRepository::get_instance()?))
+    }
+}
+
+impl<R> AnimeResolver<R>
+where
+    R: AnimeRepository + Clone,
+{
+    pub fn new(repository: R) -> Self {
+        Self {
+            season_resolver: AnimeSeasonResolver::new(repository.clone()),
+            title_resolver: AnimeTitleResolver::new(repository.clone()),
+        }
+    }
+
+    pub fn resolve_by_title(
+        &self,
+        title: &str,
+    ) -> Result<ResolvedSeriesMetadata, AnimeResolverError> {
+        let anime = self.title_resolver.resolve(title)?;
+        if anime.is_none() {
+            return Err(AnimeResolverError::AnimeNotFound(format!(
+                "{} no resuelto, puede ser que no haya coincidido en la busqueda",
+                title
+            )));
+        }
+
+        let anime = anime.unwrap();
+        let season = self.season_resolver.resolve(anime.id)?;
+        if season.is_none() {
+            return Err(AnimeResolverError::SeasonNotFound);
+        }
+
+        Ok(ResolvedSeriesMetadata {
+            title: anime.title,
+            season: season.unwrap(),
+        })
+    }
+}
+
+impl<R> SeriesMetadataResolver for AnimeResolver<R>
+where
+    R: AnimeRepository + Clone,
+{
     fn resolve(
         &self,
         source_directory: &Path,
@@ -307,7 +265,7 @@ impl SeriesMetadataResolver for AnimeResolver {
             .and_then(|name| name.to_str())
             .ok_or(AnimeResolverError::EmptyTitle)?;
 
-        self.resolve_title(title)
+        self.resolve_by_title(title)
             .map_err(|error| Box::new(error) as Box<dyn Error>)
     }
 }
@@ -324,185 +282,47 @@ fn normalize_title(title: &str) -> String {
         .collect()
 }
 
-fn select_previous(current: &AnimeRecord, candidates: Vec<AnimeRecord>) -> Option<AnimeRecord> {
-    select_by_date(current, candidates, Direction::Previous)
-}
-
-fn select_next(current: &AnimeRecord, candidates: Vec<AnimeRecord>) -> Option<AnimeRecord> {
-    select_by_date(current, candidates, Direction::Next)
-}
-
-enum Direction {
-    Previous,
-    Next,
-}
-
-fn select_by_date(
-    current: &AnimeRecord,
-    candidates: Vec<AnimeRecord>,
-    direction: Direction,
-) -> Option<AnimeRecord> {
-    let mut dated: Vec<_> = candidates
-        .iter()
-        .filter(|anime| anime.start_date.is_some())
-        .collect();
-
-    if let Some(current_date) = current.start_date.as_deref() {
-        let chronological: Vec<_> = dated
-            .iter()
-            .copied()
-            .filter(|anime| match direction {
-                Direction::Previous => anime.start_date.as_deref() <= Some(current_date),
-                Direction::Next => anime.start_date.as_deref() >= Some(current_date),
-            })
-            .collect();
-        if !chronological.is_empty() {
-            dated = chronological;
-        }
-    }
-
-    dated.sort_by(|left, right| {
-        left.start_date
-            .cmp(&right.start_date)
-            .then(left.id.cmp(&right.id))
-    });
-    let selected = match direction {
-        Direction::Previous => dated.last(),
-        Direction::Next => dated.first(),
-    };
-
-    selected
-        .cloned()
-        .cloned()
-        .or_else(|| candidates.into_iter().min_by_key(|anime| anime.id))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::anime::FakeAnimeRepository;
 
-    fn anime(
-        id: u64,
-        title: &str,
-        media_type: &str,
-        start_date: &str,
-        prequel_ids: &[u64],
-        sequel_ids: &[u64],
-    ) -> AnimeRecord {
-        AnimeRecord {
-            id,
-            title: title.into(),
-            alternative_titles: Vec::new(),
-            media_type: media_type.into(),
-            start_date: Some(start_date.into()),
-            prequel_ids: prequel_ids.into(),
-            sequel_ids: sequel_ids.into(),
-        }
-    }
+    #[test]
+    fn anime_season_resolver_counts_tv_prequels() {
+        let resolver = AnimeSeasonResolver::new(FakeAnimeRepository::new());
 
-    fn resolver(anime: Vec<AnimeRecord>) -> (AnimeResolver, HashMap<u64, AnimeRecord>) {
-        (
-            AnimeResolver::new(Client::new("test-api-key").unwrap()),
-            anime.into_iter().map(|entry| (entry.id, entry)).collect(),
-        )
-    }
+        let season = resolver.resolve(61203).unwrap();
 
-    fn resolve_from_cache(
-        resolver: &AnimeResolver,
-        target_id: u64,
-        cache: &mut HashMap<u64, AnimeRecord>,
-    ) -> Result<(u64, Vec<AnimeSeason>), AnimeResolverError> {
-        let target = cache.get(&target_id).unwrap().clone();
-        resolver.resolve_target(target, cache)
+        assert_eq!(season, Some(4));
     }
 
     #[test]
-    fn resolves_the_root_title_and_target_season() {
-        let (resolver, mut cache) = resolver(vec![
-            anime(1, "Example", "tv", "2020-01-01", &[], &[2]),
-            anime(2, "Example 2", "tv", "2021-01-01", &[1], &[3]),
-            anime(3, "Example 3", "tv", "2022-01-01", &[2], &[]),
-        ]);
+    fn anime_title_resolver_matches_an_alternative_title() {
+        let resolver = AnimeTitleResolver::new(FakeAnimeRepository::new());
 
-        let (target_id, seasons) = resolve_from_cache(&resolver, 2, &mut cache).unwrap();
-        let target = seasons
-            .iter()
-            .find(|season| season.anime_id == target_id)
-            .unwrap();
-        assert_eq!(seasons[0].title, "Example");
-        assert_eq!(target.season, 2);
-    }
-
-    #[test]
-    fn follows_related_anime_regardless_of_media_type() {
-        let (resolver, mut cache) = resolver(vec![
-            anime(1, "Example Movie", "movie", "2019-01-01", &[], &[2]),
-            anime(2, "Example", "tv", "2020-01-01", &[1], &[3]),
-            anime(3, "Example OVA", "ova", "2020-06-01", &[2], &[4]),
-            anime(4, "Example ONA", "ona", "2021-01-01", &[3], &[]),
-        ]);
-
-        let (_, seasons) = resolve_from_cache(&resolver, 2, &mut cache).unwrap();
-        assert_eq!(
-            seasons
-                .iter()
-                .map(|season| season.anime_id)
-                .collect::<Vec<_>>(),
-            vec![1, 2, 3, 4]
-        );
-    }
-
-    #[test]
-    fn selects_an_exact_movie_title() {
-        let (resolver, mut cache) = resolver(vec![anime(
-            1,
-            "Example Movie",
-            "movie",
-            "2020-01-01",
-            &[],
-            &[],
-        )]);
-        let results = vec![Anime {
-            id: 1,
-            title: "Example Movie".into(),
-            main_picture: None,
-        }];
-
-        let selected = resolver
-            .select_search_result("example movie", results, &mut cache)
+        let anime = resolver
+            .resolve("KonoSuba God's Blessing on This Wonderful World 4")
+            .unwrap()
             .unwrap();
 
-        assert_eq!(selected.id, 1);
+        assert_eq!(anime.id, 61203);
+        assert_eq!(anime.title, "Kono Subarashii Sekai ni Shukufuku wo! 4");
     }
 
     #[test]
-    fn chooses_the_closest_later_sequel_by_air_date() {
-        let (resolver, mut cache) = resolver(vec![
-            anime(1, "Example", "tv", "2020-01-01", &[], &[3, 2]),
-            anime(2, "Example 2", "tv", "2021-01-01", &[1], &[3]),
-            anime(3, "Example 3", "tv", "2022-01-01", &[1, 2], &[]),
-        ]);
+    fn anime_resolver_resolves_the_canonical_title_and_season() {
+        let resolver = AnimeResolver::new(FakeAnimeRepository::new());
 
-        let (_, seasons) = resolve_from_cache(&resolver, 1, &mut cache).unwrap();
-        assert_eq!(
-            seasons
-                .iter()
-                .map(|season| (season.anime_id, season.season))
-                .collect::<Vec<_>>(),
-            vec![(1, 1), (2, 2), (3, 3)]
-        );
-    }
-
-    #[test]
-    fn detects_relation_cycles() {
-        let (resolver, mut cache) = resolver(vec![
-            anime(1, "Example", "tv", "2020-01-01", &[], &[2]),
-            anime(2, "Example 2", "tv", "2021-01-01", &[1], &[1]),
-        ]);
+        let metadata = resolver
+            .resolve_by_title("KonoSuba God's Blessing on This Wonderful World 4")
+            .unwrap();
 
         assert_eq!(
-            resolve_from_cache(&resolver, 1, &mut cache),
-            Err(AnimeResolverError::RelationCycle(1))
+            metadata,
+            ResolvedSeriesMetadata {
+                title: "Kono Subarashii Sekai ni Shukufuku wo! 4".into(),
+                season: 4,
+            }
         );
     }
 
@@ -520,80 +340,5 @@ mod tests {
             "Honzuki no Gekokujou 2nd Season",
             "Honzuki no Gekokujou 3rd Season",
         ));
-    }
-
-    #[test]
-    fn selects_the_exact_normalized_title_instead_of_api_order() {
-        let (resolver, mut cache) = resolver(vec![
-            anime(
-                2,
-                "Example: Long Title 2nd Season",
-                "tv",
-                "2021-01-01",
-                &[],
-                &[],
-            ),
-            anime(
-                3,
-                "Example: Long Title 3rd Season",
-                "tv",
-                "2022-01-01",
-                &[],
-                &[],
-            ),
-        ]);
-        let results = vec![
-            Anime {
-                id: 2,
-                title: "Example: Long Title 2nd Season".into(),
-                main_picture: None,
-            },
-            Anime {
-                id: 3,
-                title: "Example: Long Title 3rd Season".into(),
-                main_picture: None,
-            },
-        ];
-
-        let selected = resolver
-            .select_search_result("example long title 3rd season", results, &mut cache)
-            .unwrap();
-
-        assert_eq!(selected.id, 3);
-    }
-
-    #[test]
-    fn rejects_ambiguous_search_results_without_an_exact_title() {
-        let (resolver, mut cache) = resolver(vec![
-            anime(2, "Example 2nd Season", "tv", "2021-01-01", &[], &[]),
-            anime(3, "Example 3rd Season", "tv", "2022-01-01", &[], &[]),
-        ]);
-        let results = vec![
-            Anime {
-                id: 2,
-                title: "Example 2nd Season".into(),
-                main_picture: None,
-            },
-            Anime {
-                id: 3,
-                title: "Example 3rd Season".into(),
-                main_picture: None,
-            },
-        ];
-
-        let error = resolver
-            .select_search_result("Example", results, &mut cache)
-            .unwrap_err();
-
-        assert_eq!(
-            error,
-            AnimeResolverError::AmbiguousAnimeTitle {
-                title: "Example".into(),
-                candidates: vec![
-                    "Example 2nd Season (2)".into(),
-                    "Example 3rd Season (3)".into(),
-                ],
-            }
-        );
     }
 }

@@ -1,3 +1,5 @@
+mod anime;
+mod client;
 mod commands;
 mod config;
 mod database;

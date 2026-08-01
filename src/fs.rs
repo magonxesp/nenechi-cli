@@ -50,68 +50,6 @@ pub fn unwrap_optional_os_str(os_str: Option<&OsStr>) -> Result<String, Box<dyn 
     Ok(path_string)
 }
 
-pub fn sanitize_filename_component(value: &str) -> String {
-    let mut sanitized = String::with_capacity(value.len());
-
-    for character in value.chars() {
-        let invalid = character.is_control()
-            || matches!(
-                character,
-                '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*'
-            );
-        if invalid {
-            if !sanitized.ends_with('_') {
-                sanitized.push('_');
-            }
-        } else {
-            sanitized.push(character);
-        }
-    }
-
-    let sanitized = sanitized
-        .trim()
-        .trim_end_matches(&['.', ' '][..])
-        .to_string();
-    let mut sanitized = if sanitized.is_empty() {
-        "_".to_string()
-    } else {
-        sanitized
-    };
-
-    if is_windows_reserved_name(&sanitized) {
-        sanitized.insert(0, '_');
-    }
-
-    sanitized
-}
-
-pub fn sanitize_relative_path(path: &Path) -> PathBuf {
-    path.components()
-        .filter_map(|component| match component {
-            std::path::Component::Normal(value) => {
-                Some(sanitize_filename_component(&value.to_string_lossy()))
-            }
-            _ => None,
-        })
-        .collect()
-}
-
-fn is_windows_reserved_name(value: &str) -> bool {
-    let stem = value
-        .split('.')
-        .next()
-        .unwrap_or(value)
-        .trim_end_matches(&['.', ' '][..])
-        .to_ascii_uppercase();
-
-    matches!(
-        stem.as_str(),
-        "CON" | "PRN" | "AUX" | "NUL" | "CLOCK$" | "CONIN$" | "CONOUT$"
-    ) || (stem.len() == 4
-        && matches!(&stem.as_bytes()[..3], b"COM" | b"LPT")
-        && matches!(stem.as_bytes()[3], b'1'..=b'9'))
-}
-
 /// create a symlink for a file
 /// if the link exists, it skips the link creation
 pub fn symlink_file(original: &Path, link: &Path) -> Result<(), Box<dyn Error>> {
@@ -249,28 +187,6 @@ mod tests {
                 Path::new("wallpapers/cities/london/river/boat.jpeg"),
                 &patterns
             )
-        );
-    }
-
-    #[test]
-    fn sanitizes_filename_components_for_windows_and_smb() {
-        assert_eq!(
-            sanitize_filename_component("Anime: Part 2?"),
-            "Anime_ Part 2_"
-        );
-        assert_eq!(sanitize_filename_component("CON.mkv"), "_CON.mkv");
-        assert_eq!(
-            sanitize_filename_component("Título 日本語"),
-            "Título 日本語"
-        );
-        assert_eq!(sanitize_filename_component("trailing. "), "trailing");
-    }
-
-    #[test]
-    fn sanitizes_every_component_of_a_relative_path() {
-        assert_eq!(
-            sanitize_relative_path(Path::new("Movie: Name/Extras?/CON.srt")),
-            PathBuf::from("Movie_ Name/Extras_/_CON.srt")
         );
     }
 }

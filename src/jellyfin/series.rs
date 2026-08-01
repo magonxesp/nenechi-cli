@@ -1,16 +1,16 @@
-use crate::fs::{sanitize_filename_component, symlink_file};
+use crate::fs::symlink_file;
 use crate::jellyfin::config::{SeriesCategory, TargetConfig, TargetType};
 use crate::jellyfin::pattern::EpisodePatterns;
 use log::warn;
 use std::error::Error;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use walkdir::WalkDir;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ResolvedSeriesMetadata {
     pub title: String,
-    pub season: u32,
+    pub season: i64,
 }
 
 pub trait SeriesMetadataResolver {
@@ -83,10 +83,9 @@ pub fn organize(
                 continue;
             }
         };
-        let safe_title = sanitize_filename_component(&metadata.title);
         let season_directory = target
             .destination
-            .join(&safe_title)
+            .join(&metadata.title)
             .join(format!("Season {:02}", metadata.season));
         fs::create_dir_all(&season_directory)?;
 
@@ -99,10 +98,10 @@ pub fn organize(
                 continue;
             };
             let extension = extension.to_string_lossy();
-            let file_name = sanitize_filename_component(&format!(
+            let file_name = format!(
                 "{} - S{:02}E{:02}.{}",
-                safe_title, metadata.season, episode.number, extension
-            ));
+                metadata.title, metadata.season, episode.number, extension
+            );
             let destination = season_directory.join(file_name);
             let source = fs::canonicalize(&episode.path)?;
             symlink_file(&source, &destination)?;
@@ -136,6 +135,17 @@ fn validate_metadata(metadata: &ResolvedSeriesMetadata) -> Result<(), Box<dyn Er
         return Err("resolved series season must be greater than zero".into());
     }
 
+    let path = Path::new(&metadata.title);
+    if path.components().count() != 1
+        || !matches!(path.components().next(), Some(Component::Normal(_)))
+    {
+        return Err(format!(
+            "resolved series title {:?} is not a safe directory name",
+            metadata.title
+        )
+        .into());
+    }
+
     Ok(())
 }
 
@@ -154,7 +164,7 @@ mod tests {
             _category: &SeriesCategory,
         ) -> Result<ResolvedSeriesMetadata, Box<dyn Error>> {
             Ok(ResolvedSeriesMetadata {
-                title: "Example: Anime?/Part".into(),
+                title: "Example: Anime?".into(),
                 season: 2,
             })
         }
@@ -192,6 +202,13 @@ mod tests {
             validate_metadata(&ResolvedSeriesMetadata {
                 title: "Example".into(),
                 season: 0,
+            })
+            .is_err()
+        );
+        assert!(
+            validate_metadata(&ResolvedSeriesMetadata {
+                title: "../unsafe".into(),
+                season: 1,
             })
             .is_err()
         );
@@ -237,13 +254,13 @@ mod tests {
 
         let filesystem_order = media_files(&target, &series_source).unwrap();
         assert_eq!(organize(&target, &FixedResolver).unwrap(), 2);
-        let season = destination.join("Example_ Anime_Part").join("Season 02");
+        let season = destination.join("Example: Anime?").join("Season 02");
         assert_eq!(
-            fs::read_link(season.join("Example_ Anime_Part - S02E01.mkv")).unwrap(),
+            fs::read_link(season.join("Example: Anime? - S02E01.mkv")).unwrap(),
             fs::canonicalize(&filesystem_order[0]).unwrap()
         );
         assert_eq!(
-            fs::read_link(season.join("Example_ Anime_Part - S02E02.mkv")).unwrap(),
+            fs::read_link(season.join("Example: Anime? - S02E02.mkv")).unwrap(),
             fs::canonicalize(&filesystem_order[1]).unwrap()
         );
     }
@@ -304,7 +321,7 @@ mod tests {
         fs::write(series_source.join("episode.mkv"), b"episode").unwrap();
 
         // This file prevents creation of the resolved series directory.
-        fs::write(destination.join("Example_ Anime_Part"), b"blocking file").unwrap();
+        fs::write(destination.join("Example: Anime?"), b"blocking file").unwrap();
 
         let target = TargetConfig {
             name: "anime".into(),

@@ -30,6 +30,51 @@ pub struct Anime {
     pub main_picture: Option<MainPicture>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct WebSearchResponse {
+    categories: Vec<WebSearchCategory>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WebSearchCategory {
+    #[serde(rename = "type")]
+    category_type: String,
+    items: Vec<WebSearchItem>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WebSearchItem {
+    id: u64,
+    name: String,
+    image_url: Option<String>,
+}
+
+impl WebSearchResponse {
+    pub fn into_anime(self) -> Vec<Anime> {
+        self.categories
+            .into_iter()
+            .filter(|category| category.category_type == "anime")
+            .flat_map(|category| category.items)
+            .map(Anime::from)
+            .collect()
+    }
+}
+
+impl From<WebSearchItem> for Anime {
+    fn from(item: WebSearchItem) -> Self {
+        let main_picture = item.image_url.map(|url| MainPicture {
+            medium: url.clone(),
+            large: url,
+        });
+
+        Self {
+            id: item.id,
+            title: item.name,
+            main_picture,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct AnimeDetails {
     pub id: u64,
@@ -254,7 +299,7 @@ pub struct Paging {
 }
 
 impl Client {
-    pub fn get_anime(&self, anime_id: u64) -> Result<Option<AnimeDetails>, ClientError> {
+    pub fn get_by_id(&self, anime_id: u64) -> Result<Option<AnimeDetails>, ClientError> {
         let request = self
             .get(&format!("anime/{anime_id}"))
             .query(&[("fields", ANIME_DETAILS_FIELDS)]);
@@ -266,15 +311,30 @@ impl Client {
         }
 
         self.check_response_error(&response)?;
-        response.json().map_err(|err| ClientError::Other(err.to_string()))
+        response
+            .json()
+            .map_err(|err| ClientError::Other(err.to_string()))
     }
 
-    pub fn search_anime(&self, name: &str) -> Result<AnimeSearchResponse, ClientError> {
+    pub fn search_by_title(&self, name: &str) -> Result<AnimeSearchResponse, ClientError> {
         let request = self.search_anime_request(name)?;
         let response = self.try_send(request)?;
         self.check_response_error(&response)?;
 
-        response.json().map_err(|err| ClientError::Other(err.to_string()))
+        response
+            .json()
+            .map_err(|err| ClientError::Other(err.to_string()))
+    }
+
+    pub fn web_search_by_title(&self, name: &str) -> Result<Vec<Anime>, ClientError> {
+        let request = self.web_search_anime_request(name)?;
+        let response = self.try_send(request)?;
+        self.check_response_error(&response)?;
+        let response = response
+            .json::<WebSearchResponse>()
+            .map_err(|err| ClientError::Other(err.to_string()))?;
+
+        Ok(response.into_anime())
     }
 
     fn search_anime_request(&self, name: &str) -> Result<RequestBuilder, ClientError> {
@@ -289,6 +349,19 @@ impl Client {
         let query = compact_search_query(name);
 
         Ok(self.get("anime").query(&[("q", query)]))
+    }
+
+    fn web_search_anime_request(&self, name: &str) -> Result<RequestBuilder, ClientError> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(ClientError::EmptySearchQuery);
+        }
+
+        Ok(self.web_get("search/prefix.json").query(&[
+            ("type", "all"),
+            ("keyword", name),
+            ("v", "1"),
+        ]))
     }
 }
 
@@ -380,5 +453,82 @@ mod tests {
             .unwrap();
 
         assert_eq!(query, format!("{} {}", "本".repeat(40), "語".repeat(23)));
+    }
+
+    #[test]
+    fn web_search_request_uses_the_public_endpoint() {
+        let client = Client::new("client-id").unwrap();
+        let request = client
+            .web_search_anime_request(" Sora no ")
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert_eq!(
+            request.url().as_str(),
+            "https://myanimelist.net/search/prefix.json?type=all&keyword=Sora+no&v=1"
+        );
+        assert!(request.headers().get("X-MAL-CLIENT-ID").is_none());
+    }
+
+    #[test]
+    fn web_search_request_keeps_the_complete_title() {
+        let client = Client::new("client-id").unwrap();
+        let title = "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen - Ryoushu no Youjo";
+        let request = client
+            .web_search_anime_request(title)
+            .unwrap()
+            .build()
+            .unwrap();
+        let keyword = request
+            .url()
+            .query_pairs()
+            .find_map(|(key, value)| (key == "keyword").then(|| value.into_owned()))
+            .unwrap();
+
+        assert_eq!(keyword, title);
+    }
+
+    #[test]
+    fn web_search_response_only_maps_the_anime_category() {
+        let response: WebSearchResponse = serde_json::from_str(
+            r#"{
+                "categories": [
+                    {
+                        "type": "anime",
+                        "items": [{
+                            "id": 5958,
+                            "type": "anime",
+                            "name": "Sora no Otoshimono",
+                            "image_url": "https://cdn.myanimelist.net/anime.jpg"
+                        }]
+                    },
+                    {
+                        "type": "manga",
+                        "items": [{
+                            "id": 8144,
+                            "type": "manga",
+                            "name": "Sora no Otoshimono",
+                            "image_url": "https://cdn.myanimelist.net/manga.jpg"
+                        }]
+                    }
+                ]
+            }"#,
+        )
+        .unwrap();
+
+        let anime = response.into_anime();
+
+        assert_eq!(
+            anime,
+            vec![Anime {
+                id: 5958,
+                title: "Sora no Otoshimono".into(),
+                main_picture: Some(MainPicture {
+                    medium: "https://cdn.myanimelist.net/anime.jpg".into(),
+                    large: "https://cdn.myanimelist.net/anime.jpg".into(),
+                }),
+            }]
+        );
     }
 }

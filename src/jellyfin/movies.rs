@@ -1,4 +1,4 @@
-use crate::fs::{sanitize_filename_component, sanitize_relative_path, symlink_file};
+use crate::fs::symlink_file;
 use crate::jellyfin::config::{TargetConfig, TargetType};
 use std::error::Error;
 use std::fs;
@@ -37,9 +37,10 @@ pub fn organize(target: &TargetConfig) -> Result<usize, Box<dyn Error>> {
 }
 
 fn organize_standalone_movie(target: &TargetConfig, path: &Path) -> Result<(), Box<dyn Error>> {
-    let title = sanitize_filename_component(&file_stem(path)?.to_string_lossy());
-    let file_name = sanitize_filename_component(&file_name(path)?.to_string_lossy());
-    let destination = target.destination.join(title).join(file_name);
+    let destination = target
+        .destination
+        .join(file_stem(path)?)
+        .join(file_name(path)?);
     create_link(path, &destination)
 }
 
@@ -47,7 +48,7 @@ fn organize_movie_directory(
     target: &TargetConfig,
     movie_directory: &Path,
 ) -> Result<usize, Box<dyn Error>> {
-    let movie_name = sanitize_filename_component(&file_name(movie_directory)?.to_string_lossy());
+    let movie_name = file_name(movie_directory)?;
     let mut links = 0;
 
     for entry in WalkDir::new(movie_directory)
@@ -60,8 +61,8 @@ fn organize_movie_directory(
             continue;
         }
 
-        let relative = sanitize_relative_path(entry.path().strip_prefix(movie_directory)?);
-        let destination = target.destination.join(&movie_name).join(relative);
+        let relative = entry.path().strip_prefix(movie_directory)?;
+        let destination = target.destination.join(movie_name).join(relative);
         create_link(entry.path(), &destination)?;
         links += 1;
     }
@@ -115,8 +116,8 @@ mod tests {
 
         assert_eq!(organize(&target).unwrap(), 1);
         let link = destination
-            .join("Example_ Movie_")
-            .join("Example_ Movie_.mkv");
+            .join("Example: Movie?")
+            .join("Example: Movie?.mkv");
         assert!(
             fs::symlink_metadata(&link)
                 .unwrap()

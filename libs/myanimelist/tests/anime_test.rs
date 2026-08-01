@@ -13,7 +13,7 @@ fn it_should_search_by_anime_title() {
     let api_key = env::var("MYANIMELIST_API_KEY").expect("MYANIMELIST_API_KEY debe estar definida");
     let client = Client::new(api_key).unwrap();
 
-    let response = client.search_anime("New Game").unwrap();
+    let response = client.search_by_title("New Game").unwrap();
 
     assert!(
         response
@@ -31,7 +31,7 @@ fn it_should_search_a_long_title_without_losing_the_season_suffix() {
     let client = Client::new(api_key).unwrap();
 
     let response = client
-        .search_anime(
+        .search_by_title(
             "Honzuki no Gekokujou Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen 3rd Season",
         )
         .unwrap();
@@ -46,7 +46,7 @@ fn it_should_get_anime_by_id() {
     let api_key = env::var("MYANIMELIST_API_KEY").expect("MYANIMELIST_API_KEY debe estar definida");
     let client = Client::new(api_key).unwrap();
 
-    let anime = client.get_anime(31953).unwrap();
+    let anime = client.get_by_id(31953).unwrap();
     assert_eq!(true, anime.is_some(), "anime not found");
 
     let anime = anime.unwrap();

@@ -1,0 +1,88 @@
+{
+  "id": 61203,
+  "title": "Kono Subarashii Sekai ni Shukufuku wo! 4",
+  "main_picture": {
+    "medium": "https://cdn.myanimelist.net/images/anime/1353/159201.jpg",
+    "large": "https://cdn.myanimelist.net/images/anime/1353/159201l.jpg"
+  },
+  "alternative_titles": {
+    "synonyms": [],
+    "en": "KonoSuba: God's Blessing on This Wonderful World! 4",
+    "ja": "この素晴らしい世界に祝福を！4"
+  },
+  "start_date": "2027",
+  "synopsis": "Fourth season of Kono Subarashii Sekai ni Shukufuku wo!.",
+  "popularity": 3006,
+  "num_list_users": 70899,
+  "num_scoring_users": 0,
+  "nsfw": "white",
+  "created_at": "2025-03-14T03:11:44+00:00",
+  "updated_at": "2026-07-26T08:11:18+00:00",
+  "media_type": "tv",
+  "status": "not_yet_aired",
+  "genres": [
+    {
+      "id": 2,
+      "name": "Adventure"
+    },
+    {
+      "id": 4,
+      "name": "Comedy"
+    },
+    {
+      "id": 10,
+      "name": "Fantasy"
+    },
+    {
+      "id": 62,
+      "name": "Isekai"
+    },
+    {
+      "id": 20,
+      "name": "Parody"
+    }
+  ],
+  "num_episodes": 0,
+  "source": "light_novel",
+  "average_episode_duration": 0,
+  "rating": "pg_13",
+  "pictures": [
+    {
+      "medium": "https://cdn.myanimelist.net/images/anime/1353/159201.jpg",
+      "large": "https://cdn.myanimelist.net/images/anime/1353/159201l.jpg"
+    }
+  ],
+  "background": "",
+  "related_anime": [
+    {
+      "node": {
+        "id": 49458,
+        "title": "Kono Subarashii Sekai ni Shukufuku wo! 3",
+        "main_picture": {
+          "medium": "https://cdn.myanimelist.net/images/anime/1758/141268.jpg",
+          "large": "https://cdn.myanimelist.net/images/anime/1758/141268l.jpg"
+        }
+      },
+      "relation_type": "prequel",
+      "relation_type_formatted": "Prequel"
+    }
+  ],
+  "related_manga": [],
+  "recommendations": [],
+  "studios": [
+    {
+      "id": 1974,
+      "name": "ENGI"
+    }
+  ],
+  "statistics": {
+    "status": {
+      "watching": "1",
+      "completed": 0,
+      "on_hold": "1",
+      "dropped": 0,
+      "plan_to_watch": "70897"
+    },
+    "num_list_users": 70899
+  }
+}

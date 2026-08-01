@@ -1,3 +1,4 @@
+use crate::anime::CachedAnimeRepository;
 use crate::config::{CliConfig, MyAnimeListConfig};
 use crate::jellyfin::anime::AnimeResolver;
 use crate::jellyfin::config::{JellyfinConfig, SeriesCategory, TargetConfig, TargetType};
@@ -29,7 +30,7 @@ impl Display for JellyfinCommands {
 
 pub fn execute_jellyfin_command(command: JellyfinCommands) -> Result<(), String> {
     let config = JellyfinConfig::read()?;
-    let anime_resolver = anime_resolver(&config, &CliConfig::get_instance().myanimelist)?;
+    let anime_resolver = anime_resolver(&config)?;
     let result = match command {
         JellyfinCommands::Index => index(
             &config,
@@ -230,10 +231,7 @@ fn mount(
     Ok(links)
 }
 
-fn anime_resolver(
-    config: &JellyfinConfig,
-    myanimelist: &MyAnimeListConfig,
-) -> Result<Option<AnimeResolver>, String> {
+fn anime_resolver(config: &JellyfinConfig) -> Result<Option<impl SeriesMetadataResolver>, String> {
     let has_anime_target = config.targets.iter().any(|target| {
         target.target_type == TargetType::Series
             && target
@@ -245,9 +243,8 @@ fn anime_resolver(
         return Ok(None);
     }
 
-    let client = Client::new(myanimelist.client_id()?)
-        .map_err(|error| format!("failed creating MyAnimeList client: {error}"))?;
-    Ok(Some(AnimeResolver::new(client)))
+    let resolver = AnimeResolver::build().map_err(|error| error.to_string())?;
+    Ok(Some(resolver))
 }
 
 #[cfg(test)]

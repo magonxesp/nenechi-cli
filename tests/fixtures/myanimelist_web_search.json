@@ -1,0 +1,174 @@
+{
+  "categories": [
+    {
+      "type": "anime",
+      "items": [
+        {
+          "id": 38040,
+          "type": "anime",
+          "name": "Kono Subarashii Sekai ni Shukufuku wo! Movie: Kurenai Densetsu",
+          "url": "https://myanimelist.net/anime/38040/Kono_Subarashii_Sekai_ni_Shukufuku_wo_Movie__Kurenai_Densetsu",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/1638/119321.jpg?s=1f53442f688ff0067d74e22c3a109c5b",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/1638/119321.jpg?s=95649f23447512fcfd65d2dab4123339",
+          "payload": {
+            "media_type": "Movie",
+            "start_year": 2019,
+            "aired": "Aug 30, 2019",
+            "score": "8.40",
+            "status": "Finished Airing"
+          },
+          "es_score": 3.9318352
+        },
+        {
+          "id": 30831,
+          "type": "anime",
+          "name": "Kono Subarashii Sekai ni Shukufuku wo!",
+          "url": "https://myanimelist.net/anime/30831/Kono_Subarashii_Sekai_ni_Shukufuku_wo",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/1895/142748.jpg?s=213144992a9da3dc8cc40f0ef8545529",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/1895/142748.jpg?s=33332066e260bd8faae9ba56383c275e",
+          "payload": {
+            "media_type": "TV",
+            "start_year": 2016,
+            "aired": "Jan 14, 2016 to Mar 17, 2016",
+            "score": "8.09",
+            "status": "Finished Airing"
+          },
+          "es_score": 3.9122105
+        },
+        {
+          "id": 32937,
+          "type": "anime",
+          "name": "Kono Subarashii Sekai ni Shukufuku wo! 2",
+          "url": "https://myanimelist.net/anime/32937/Kono_Subarashii_Sekai_ni_Shukufuku_wo_2",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/2/83188.jpg?s=45564cc3391bf15a6928ec5419ad9e8b",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/2/83188.jpg?s=6f0e7e94ef5d55395f147d97e919db8a",
+          "payload": {
+            "media_type": "TV",
+            "start_year": 2017,
+            "aired": "Jan 12, 2017 to Mar 16, 2017",
+            "score": "8.24",
+            "status": "Finished Airing"
+          },
+          "es_score": 3.5864093
+        },
+        {
+          "id": 51958,
+          "type": "anime",
+          "name": "Kono Subarashii Sekai ni Bakuen wo!",
+          "url": "https://myanimelist.net/anime/51958/Kono_Subarashii_Sekai_ni_Bakuen_wo",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/1626/135844.jpg?s=8b3115e7c1283780d252ec5018ba482e",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/1626/135844.jpg?s=6808d6b822a390b7ef6d4e4ae69c3035",
+          "payload": {
+            "media_type": "TV",
+            "start_year": 2023,
+            "aired": "Apr 6, 2023 to Jun 22, 2023",
+            "score": "7.52",
+            "status": "Finished Airing"
+          },
+          "es_score": 2.8978894
+        },
+        {
+          "id": 34626,
+          "type": "anime",
+          "name": "Kono Subarashii Sekai ni Shukufuku wo! 2: Kono Subarashii Geijutsu ni Shukufuku wo!",
+          "url": "https://myanimelist.net/anime/34626/Kono_Subarashii_Sekai_ni_Shukufuku_wo_2__Kono_Subarashii_Geijutsu_ni_Shukufuku_wo",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/1115/98517.jpg?s=7fcb49b3337c009dbb49949006c38b33",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/1115/98517.jpg?s=efb27be5f35b7bc7f3c4f6ceae7a0966",
+          "payload": {
+            "media_type": "OVA",
+            "start_year": 2017,
+            "aired": "Jul 24, 2017",
+            "score": "8.01",
+            "status": "Finished Airing"
+          },
+          "es_score": 2.6936889
+        },
+        {
+          "id": 32380,
+          "type": "anime",
+          "name": "Kono Subarashii Sekai ni Shukufuku wo!: Kono Subarashii Choker ni Shukufuku wo!",
+          "url": "https://myanimelist.net/anime/32380/Kono_Subarashii_Sekai_ni_Shukufuku_wo__Kono_Subarashii_Choker_ni_Shukufuku_wo",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/1649/98516.jpg?s=b78c1fa73236cb5d5ef013270651e46c",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/1649/98516.jpg?s=fd6077f6f8ace36cf2d0d4c2e068e59b",
+          "payload": {
+            "media_type": "OVA",
+            "start_year": 2016,
+            "aired": "Jun 24, 2016",
+            "score": "7.82",
+            "status": "Finished Airing"
+          },
+          "es_score": 2.59071
+        },
+        {
+          "id": 49458,
+          "type": "anime",
+          "name": "Kono Subarashii Sekai ni Shukufuku wo! 3",
+          "url": "https://myanimelist.net/anime/49458/Kono_Subarashii_Sekai_ni_Shukufuku_wo_3",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/1758/141268.jpg?s=16e7b27406f12ef7e8b4011261e2c1f5",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/1758/141268.jpg?s=03208a9db93f36989562197f3bb9f616",
+          "payload": {
+            "media_type": "TV",
+            "start_year": 2024,
+            "aired": "Apr 10, 2024 to Jun 19, 2024",
+            "score": "8.33",
+            "status": "Finished Airing"
+          },
+          "es_score": 2.557518
+        },
+        {
+          "id": 59833,
+          "type": "anime",
+          "name": "Kono Subarashii Sekai ni Shukufuku wo! 3: Bonus Stage",
+          "url": "https://myanimelist.net/anime/59833/Kono_Subarashii_Sekai_ni_Shukufuku_wo_3__Bonus_Stage",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/1482/146928.jpg?s=f0c61b5d89885aae5cff4dbe4409509a",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/1482/146928.jpg?s=aef64452dcda903e9da8fffb6af88995",
+          "payload": {
+            "media_type": "OVA",
+            "start_year": 2025,
+            "aired": "Apr 25, 2025",
+            "score": "8.14",
+            "status": "Finished Airing"
+          },
+          "es_score": 1.6386925
+        },
+        {
+          "id": 61203,
+          "type": "anime",
+          "name": "Kono Subarashii Sekai ni Shukufuku wo! 4",
+          "url": "https://myanimelist.net/anime/61203/Kono_Subarashii_Sekai_ni_Shukufuku_wo_4",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/1353/159201.jpg?s=29d73086a67ffd9f967d45bda5b08fcc",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/1353/159201.jpg?s=9d7076d152712fe85b70238c33562029",
+          "payload": {
+            "media_type": "TV",
+            "start_year": 2027,
+            "aired": "2027 to ?",
+            "score": "N/A",
+            "status": "Not yet aired"
+          },
+          "es_score": 1.5446332
+        }
+      ]
+    },
+    {
+      "type": "manga",
+      "items": [
+        {
+          "id": 60553,
+          "type": "manga",
+          "name": "Kono Subarashii Sekai ni Shukufuku wo!",
+          "url": "https://myanimelist.net/manga/60553/Kono_Subarashii_Sekai_ni_Shukufuku_wo",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/manga/1/174932.jpg?s=42818e442eab28d862b3c8b1bbc40cbe",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/manga/1/174932.jpg?s=f0ee1194ef64b93dd425fdf5fc67adca",
+          "payload": {
+            "media_type": "Light Novel",
+            "start_year": 2013,
+            "published": "Oct 1, 2013 to May 1, 2020",
+            "score": "8.61",
+            "status": "Finished"
+          },
+          "es_score": 1.7534344
+        }
+      ]
+    }
+  ]
+}
