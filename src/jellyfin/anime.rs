@@ -7,53 +7,6 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::path::Path;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AnimeRecord {
-    pub id: u64,
-    pub title: String,
-    pub alternative_titles: Vec<String>,
-    pub media_type: String,
-    pub start_date: Option<String>,
-    pub prequel_ids: Vec<u64>,
-    pub sequel_ids: Vec<u64>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AnimeSeason {
-    pub anime_id: u64,
-    pub title: String,
-    pub season: u32,
-    pub start_date: Option<String>,
-}
-
-impl From<AnimeDetails> for AnimeRecord {
-    fn from(anime: AnimeDetails) -> Self {
-        let mut alternative_titles = anime.alternative_titles.synonyms;
-        alternative_titles.extend(anime.alternative_titles.en);
-        alternative_titles.extend(anime.alternative_titles.ja);
-
-        let mut prequel_ids = Vec::new();
-        let mut sequel_ids = Vec::new();
-        for related in anime.related_anime {
-            match related.relation_type {
-                RelationType::Prequel => prequel_ids.push(related.node.id),
-                RelationType::Sequel => sequel_ids.push(related.node.id),
-                _ => {}
-            }
-        }
-
-        Self {
-            id: anime.id,
-            title: anime.title,
-            alternative_titles,
-            media_type: anime.media_type.to_string(),
-            start_date: anime.start_date,
-            prequel_ids,
-            sequel_ids,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum AnimeResolverError {
     EmptyTitle,
