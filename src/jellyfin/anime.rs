@@ -1,7 +1,7 @@
 use crate::anime::{AnimeRepository, AnimeRepositoryError, CachedAnimeRepository};
 use crate::jellyfin::config::SeriesCategory;
 use crate::jellyfin::series::{ResolvedSeriesMetadata, SeriesMetadataResolver};
-use log::debug;
+use log::{debug, warn};
 use nenechi_myanimelist::{AnimeDetails, MediaType, RelationType};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -219,7 +219,8 @@ where
         }
 
         let first_season = self.season_resolver.resolve_first_season(anime.id)?;
-        if season.is_none() {
+        if first_season.is_none() {
+            warn!("first season not found for: {}", title);
             return Err(AnimeResolverError::SeasonNotFound);
         }
 
