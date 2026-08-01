@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+use std::sync::LazyLock;
 use reqwest::blocking::RequestBuilder;
+use reqwest::StatusCode;
 use serde::{Deserialize, Deserializer};
 
 use crate::{Client, ClientError};
@@ -18,14 +21,14 @@ pub struct AnimeSearchEntry {
     pub node: Anime,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct Anime {
     pub id: u64,
     pub title: String,
     pub main_picture: Option<MainPicture>,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct AnimeDetails {
     pub id: u64,
     pub title: String,
@@ -61,26 +64,26 @@ pub struct AnimeDetails {
     pub statistics: Statistics,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct MainPicture {
     pub medium: String,
     pub large: String,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct AlternativeTitles {
     pub synonyms: Vec<String>,
     pub en: Option<String>,
     pub ja: Option<String>,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct Genre {
     pub id: u64,
     pub name: String,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct MyListStatus {
     pub status: String,
     pub score: u8,
@@ -96,33 +99,33 @@ pub struct MyListStatus {
     pub updated_at: String,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct StartSeason {
     pub year: u64,
     pub season: String,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct Broadcast {
     pub day_of_the_week: String,
     pub start_time: Option<String>,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct RelatedAnime {
     pub node: Anime,
     pub relation_type: RelationType,
     pub relation_type_formatted: String,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct RelatedManga {
     pub node: Anime,
     pub relation_type: RelationType,
     pub relation_type_formatted: String,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum RelationType {
     Sequel,
@@ -137,25 +140,25 @@ pub enum RelationType {
     Other,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct Recommendation {
     pub node: Anime,
     pub num_recommendations: u64,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct Studio {
     pub id: u64,
     pub name: String,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct Statistics {
     pub status: StatusStatistics,
     pub num_list_users: u64,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct StatusStatistics {
     #[serde(deserialize_with = "deserialize_numeric")]
     pub watching: u64,
@@ -193,26 +196,27 @@ pub struct Paging {
 }
 
 impl Client {
-    pub fn get_anime(&self, anime_id: u64) -> Result<AnimeDetails, ClientError> {
+    pub fn get_anime(&self, anime_id: u64) -> Result<Option<AnimeDetails>, ClientError> {
         let request = self
             .get(&format!("anime/{anime_id}"))
             .query(&[("fields", ANIME_DETAILS_FIELDS)]);
-        let response = self
-            .try_send(request)?
-            .error_for_status()
-            .map_err(ClientError::Http)?;
+        let response = self.try_send(request)?;
 
-        response.json().map_err(ClientError::Http)
+        let status = response.status();
+        if status == StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        self.check_response_error(&response)?;
+        response.json().map_err(|err| ClientError::Other(err.to_string()))
     }
 
     pub fn search_anime(&self, name: &str) -> Result<AnimeSearchResponse, ClientError> {
         let request = self.search_anime_request(name)?;
-        let response = self
-            .try_send(request)?
-            .error_for_status()
-            .map_err(ClientError::Http)?;
+        let response = self.try_send(request)?;
+        self.check_response_error(&response)?;
 
-        response.json().map_err(ClientError::Http)
+        response.json().map_err(|err| ClientError::Other(err.to_string()))
     }
 
     fn search_anime_request(&self, name: &str) -> Result<RequestBuilder, ClientError> {

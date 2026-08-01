@@ -1,5 +1,5 @@
 use log::{debug, info, warn};
-use reqwest::Method;
+use reqwest::{Method, StatusCode};
 use reqwest::blocking::{RequestBuilder, Response};
 use reqwest::header::{HeaderValue, InvalidHeaderValue};
 use std::error::Error;
@@ -22,13 +22,12 @@ impl Client {
             return Err(ClientError::EmptyApiKey);
         }
 
-        let api_key =
-            HeaderValue::from_str(api_key.as_ref()).map_err(ClientError::InvalidApiKey)?;
+        let api_key = HeaderValue::from_str(api_key.as_ref())
+                .map_err(|err| ClientError::InvalidApiKey(err.to_string()))?;
 
         let http = reqwest::blocking::Client::builder()
-            .no_proxy()
             .build()
-            .map_err(ClientError::Http)?;
+            .map_err(|err| ClientError::Other(err.to_string()))?;
 
         Ok(Self { http, api_key })
     }
@@ -66,7 +65,7 @@ impl Client {
             let response = request_clone.send();
 
             if retries > MAX_RETRIES {
-                return response.map_err(ClientError::Http);
+                return response.map_err(|err| ClientError::Http(err.to_string()));
             }
 
             if let Err(error) = &response {
@@ -87,7 +86,31 @@ impl Client {
                 continue;
             }
 
-            return Ok(response.map_err(ClientError::Http)?);
+            return Ok(response.map_err(|err| ClientError::Http(err.to_string()))?);
+        }
+    }
+
+    /// comprueba si la peticion ha terminado satisfactoriamente, de lo contrario devuelve el
+    /// error correspondiente
+    pub fn check_response_error(&self, response: &Response) -> Result<(), ClientError> {
+        let status = response.status();
+
+        match status {
+            StatusCode::FORBIDDEN => Err(ClientError::InvalidApiKey(format!(
+                "{} (expired access tokens or invalid access tokens)", status
+            ))),
+            StatusCode::BAD_REQUEST => Err(ClientError::Http(format!(
+                "{} (invalid parameters)", status
+            ))),
+            _ => {
+                if status.is_server_error() {
+                    Err(ClientError::Http(status.to_string()))
+                } else if status.is_client_error() {
+                    Err(ClientError::Http(status.to_string()))
+                } else {
+                    Ok(())
+                }
+            }
         }
     }
 }
@@ -97,8 +120,9 @@ pub enum ClientError {
     EmptyApiKey,
     EmptySearchQuery,
     RequestNotCloneable,
-    InvalidApiKey(InvalidHeaderValue),
-    Http(reqwest::Error),
+    InvalidApiKey(String),
+    Http(String),
+    Other(String)
 }
 
 impl Display for ClientError {
@@ -109,20 +133,11 @@ impl Display for ClientError {
                 formatter.write_str("el nombre del anime no puede estar vacío")
             }
             Self::RequestNotCloneable => write!(formatter, "request not cloneable"),
-            Self::InvalidApiKey(error) => write!(formatter, "API key no válida: {error}"),
-            Self::Http(error) => write!(formatter, "no se pudo crear el cliente HTTP: {error}"),
+            Self::InvalidApiKey(message) => write!(formatter, "API key no válida: {message}"),
+            Self::Http(message) => write!(formatter, "la peticion HTTP ha respondido con status: {message}"),
+            Self::Other(message) => write!(formatter, "error en el cliente HTTP: {message}"),
         }
     }
 }
 
-impl Error for ClientError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::EmptyApiKey => None,
-            Self::EmptySearchQuery => None,
-            Self::RequestNotCloneable => None,
-            Self::InvalidApiKey(error) => Some(error),
-            Self::Http(error) => Some(error),
-        }
-    }
-}
+impl Error for ClientError {}

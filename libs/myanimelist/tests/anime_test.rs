@@ -47,7 +47,9 @@ fn it_should_get_anime_by_id() {
     let client = Client::new(api_key).unwrap();
 
     let anime = client.get_anime(31953).unwrap();
+    assert_eq!(true, anime.is_some(), "anime not found");
 
+    let anime = anime.unwrap();
     assert_eq!(anime.id, 31953);
     assert_eq!(anime.title, "New Game!");
     assert_eq!(anime.media_type, "tv");
