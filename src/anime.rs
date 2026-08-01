@@ -46,13 +46,24 @@ pub trait AnimeRepository {
 }
 
 #[cfg(test)]
-#[derive(Clone, Copy, Debug, Default)]
-pub struct FakeAnimeRepository;
+#[derive(Clone, Debug, Default)]
+pub struct FakeAnimeRepository {
+    // search is the optional suffix of myanimelist_web_search.json.
+    // For example: k_on will be myanimelist_web_search_k_on.json.
+    // It allow to mock specific searches
+    search: String,
+}
 
 #[cfg(test)]
 impl FakeAnimeRepository {
     pub fn new() -> Self {
-        Self
+        Self {
+            search: String::from(""),
+        }
+    }
+
+    pub fn with_search(search: &str) -> Self {
+        Self { search: search.to_string() }
     }
 }
 
@@ -65,6 +76,8 @@ impl AnimeRepository for FakeAnimeRepository {
             38040 => include_str!("../tests/fixtures/myanimelist_anime_38040.json"),
             49458 => include_str!("../tests/fixtures/myanimelist_anime_49458.json"),
             61203 => include_str!("../tests/fixtures/myanimelist_anime_61203.json"),
+            5680 => include_str!("../tests/fixtures/myanimelist_anime_5680.json"),
+            7791 => include_str!("../tests/fixtures/myanimelist_anime_7791.json"),
             _ => return Ok(None),
         };
 
@@ -74,9 +87,10 @@ impl AnimeRepository for FakeAnimeRepository {
     }
 
     fn search(&self, _title: &str) -> Result<Vec<Anime>, AnimeRepositoryError> {
-        let fixture: WebSearchResponse = serde_json::from_str(include_str!(
-            "../tests/fixtures/myanimelist_web_search.json"
-        ))
+        let fixture: WebSearchResponse = serde_json::from_str(match self.search.as_str() {
+            "k_on" => include_str!("../tests/fixtures/myanimelist_web_search_k_on.json"),
+            _ => include_str!("../tests/fixtures/myanimelist_web_search.json")
+        })
         .map_err(|error| AnimeRepositoryError::Other(error.to_string()))?;
 
         Ok(fixture.into_anime())

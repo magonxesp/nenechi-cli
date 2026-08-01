@@ -10,7 +10,7 @@ name = "nenechi-cli"
 
 [package]
 name = "nenechi-cli"
-version = "0.2.7"
+version = "0.2.8"
 edition = "2024"
 
 [dependencies]

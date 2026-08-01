@@ -6,6 +6,7 @@ use nenechi_myanimelist::{AnimeDetails, MediaType, RelationType};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::path::Path;
+use crate::fs::strip_illegal_chars;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum AnimeResolverError {
@@ -258,11 +259,7 @@ fn same_title(left: &str, right: &str) -> bool {
 }
 
 fn normalize_title(title: &str) -> String {
-    title
-        .chars()
-        .filter(|character| character.is_alphanumeric())
-        .flat_map(char::to_lowercase)
-        .collect()
+    strip_illegal_chars(title).to_lowercase()
 }
 
 #[cfg(test)]
@@ -296,7 +293,7 @@ mod tests {
         let resolver = AnimeTitleResolver::new(FakeAnimeRepository::new());
 
         let anime = resolver
-            .resolve("KonoSuba God's Blessing on This Wonderful World 4")
+            .resolve("KonoSuba God's Blessing on This Wonderful World! 4")
             .unwrap()
             .unwrap();
 
@@ -309,7 +306,7 @@ mod tests {
         let resolver = AnimeResolver::new(FakeAnimeRepository::new());
 
         let metadata = resolver
-            .resolve_by_title("KonoSuba God's Blessing on This Wonderful World 4")
+            .resolve_by_title("KonoSuba God's Blessing on This Wonderful World! 4")
             .unwrap();
 
         assert_eq!(
@@ -317,6 +314,40 @@ mod tests {
             ResolvedSeriesMetadata {
                 title: "Kono Subarashii Sekai ni Shukufuku wo!".into(),
                 season: 4,
+            }
+        );
+    }
+
+    #[test]
+    fn anime_resolver_resolves_the_canonical_title_and_season_k_on_first_season() {
+        let resolver = AnimeResolver::new(FakeAnimeRepository::with_search("k_on"));
+
+        let metadata = resolver
+            .resolve_by_title("K-On!")
+            .unwrap();
+
+        assert_eq!(
+            metadata,
+            ResolvedSeriesMetadata {
+                title: "K-On!".into(),
+                season: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn anime_resolver_resolves_the_canonical_title_and_season_k_on_second_season() {
+        let resolver = AnimeResolver::new(FakeAnimeRepository::with_search("k_on"));
+
+        let metadata = resolver
+            .resolve_by_title("K-On!!")
+            .unwrap();
+
+        assert_eq!(
+            metadata,
+            ResolvedSeriesMetadata {
+                title: "K-On!".into(),
+                season: 2,
             }
         );
     }

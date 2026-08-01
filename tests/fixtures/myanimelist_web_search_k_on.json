@@ -1,0 +1,174 @@
+{
+  "categories": [
+    {
+      "type": "anime",
+      "items": [
+        {
+          "id": 7791,
+          "type": "anime",
+          "name": "K-On!!",
+          "url": "https://myanimelist.net/anime/7791/K-On",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/12/76121.jpg?s=07ce642b804063309004f94c409e387d",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/12/76121.jpg?s=4238c112fa0393b17ad9044fc5beb907",
+          "payload": {
+            "media_type": "TV",
+            "start_year": 2010,
+            "aired": "Apr 7, 2010 to Sep 29, 2010",
+            "score": "8.18",
+            "status": "Finished Airing"
+          },
+          "es_score": 93.83809
+        },
+        {
+          "id": 5680,
+          "type": "anime",
+          "name": "K-On!",
+          "url": "https://myanimelist.net/anime/5680/K-On",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/10/76120.jpg?s=94ffb293a6c5f0c4275212eab428f67d",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/10/76120.jpg?s=d658a4e6bc5387d4778a81b5a3285d27",
+          "payload": {
+            "media_type": "TV",
+            "start_year": 2009,
+            "aired": "Apr 3, 2009 to Jun 26, 2009",
+            "score": "7.87",
+            "status": "Finished Airing"
+          },
+          "es_score": 92.88427
+        },
+        {
+          "id": 9617,
+          "type": "anime",
+          "name": "K-On! Movie",
+          "url": "https://myanimelist.net/anime/9617/K-On_Movie",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/5/76233.jpg?s=f82a56ab816a9caf93649b842ddc116f",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/5/76233.jpg?s=11f799ba5112f7f84a3aff09ff9138dd",
+          "payload": {
+            "media_type": "Movie",
+            "start_year": 2011,
+            "aired": "Dec 3, 2011",
+            "score": "8.36",
+            "status": "Finished Airing"
+          },
+          "es_score": 74.20627
+        },
+        {
+          "id": 6862,
+          "type": "anime",
+          "name": "K-On!: Live House!",
+          "url": "https://myanimelist.net/anime/6862/K-On__Live_House",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/9/15892.jpg?s=59ae84be1b273430fe14ca118146208b",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/9/15892.jpg?s=158a9a57cf29e363d33fb845b22f8e37",
+          "payload": {
+            "media_type": "Special",
+            "start_year": 2010,
+            "aired": "Jan 19, 2010",
+            "score": "7.85",
+            "status": "Finished Airing"
+          },
+          "es_score": 63.037926
+        },
+        {
+          "id": 9734,
+          "type": "anime",
+          "name": "K-On!!: Keikaku!",
+          "url": "https://myanimelist.net/anime/9734/K-On__Keikaku",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/7/26965.jpg?s=708f5014f5a40ab3977743a21aa4c7f1",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/7/26965.jpg?s=b8186faa45baf6e9bdbf49cfc2077466",
+          "payload": {
+            "media_type": "Special",
+            "start_year": 2011,
+            "aired": "Mar 16, 2011",
+            "score": "7.86",
+            "status": "Finished Airing"
+          },
+          "es_score": 58.188858
+        },
+        {
+          "id": 7017,
+          "type": "anime",
+          "name": "K-On!: Ura-On!",
+          "url": "https://myanimelist.net/anime/7017/K-On__Ura-On",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/9/23479.jpg?s=3f4784328869c3513f0c62d7293fe9a0",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/9/23479.jpg?s=b50e61b39e623871ea4311521958ff93",
+          "payload": {
+            "media_type": "Special",
+            "start_year": 2009,
+            "aired": "Jul 29, 2009 to Jan 20, 2010",
+            "score": "6.39",
+            "status": "Finished Airing"
+          },
+          "es_score": 45.078785
+        },
+        {
+          "id": 9203,
+          "type": "anime",
+          "name": "K-On!!: Ura-On!!",
+          "url": "https://myanimelist.net/anime/9203/K-On__Ura-On",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/anime/10/25513.jpg?s=ec03ee388ae2288c07157db047f16e79",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/anime/10/25513.jpg?s=06f57e23df01b05bff5969fed5972ffe",
+          "payload": {
+            "media_type": "Special",
+            "start_year": 2010,
+            "aired": "Jul 30, 2010 to Mar 16, 2011",
+            "score": "6.57",
+            "status": "Finished Airing"
+          },
+          "es_score": 39.612595
+        }
+      ]
+    },
+    {
+      "type": "manga",
+      "items": [
+        {
+          "id": 51855,
+          "type": "manga",
+          "name": "K-On! College",
+          "url": "https://myanimelist.net/manga/51855/K-On_College",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/manga/2/260521.jpg?s=542174519f5b5f26906a9b16421b147f",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/manga/2/260521.jpg?s=af0c9f54604284b2fa59c0997035a067",
+          "payload": {
+            "media_type": "Manga",
+            "start_year": 2011,
+            "published": "Apr 9, 2011 to Jun 8, 2012",
+            "score": "7.59",
+            "status": "Finished"
+          },
+          "es_score": 76.70216
+        },
+        {
+          "id": 51857,
+          "type": "manga",
+          "name": "K-On! Highschool",
+          "url": "https://myanimelist.net/manga/51857/K-On_Highschool",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/manga/3/260520.jpg?s=6a74f1a62417aaac5af3dece83af76ad",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/manga/3/260520.jpg?s=3a3b9085f11ad1062c503f3fb20a97af",
+          "payload": {
+            "media_type": "Manga",
+            "start_year": 2011,
+            "published": "Apr 28, 2011 to Jun 28, 2012",
+            "score": "7.58",
+            "status": "Finished"
+          },
+          "es_score": 72.08865
+        },
+        {
+          "id": 13001,
+          "type": "manga",
+          "name": "K-On!",
+          "url": "https://myanimelist.net/manga/13001/K-On",
+          "image_url": "https://cdn.myanimelist.net/r/116x180/images/manga/2/259427.jpg?s=79016082aa5f696d49e720cc8bac1660",
+          "thumbnail_url": "https://cdn.myanimelist.net/r/116x76/images/manga/2/259427.jpg?s=67d10b502265845233c14b41135d53ad",
+          "payload": {
+            "media_type": "Manga",
+            "start_year": 2007,
+            "published": "Apr 9, 2007 to Sep 9, 2010",
+            "score": "7.78",
+            "status": "Finished"
+          },
+          "es_score": 62.690212
+        }
+      ]
+    }
+  ]
+}

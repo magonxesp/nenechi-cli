@@ -91,6 +91,29 @@ pub fn symlink_file(original: &Path, link: &Path) -> Result<(), Box<dyn Error>> 
     }
 }
 
+/// strip illegal chars for directories and files
+pub fn strip_illegal_chars(value: &str) -> String {
+    let mut sanitized = String::with_capacity(value.len());
+
+    for char in value.chars() {
+        let is_illegal = char == '<'
+            || char == '>'
+            || char == ':'
+            || char == '"'
+            || char == '/'
+            || char == '\\'
+            || char == '|'
+            || char == '?'
+            || char == '*';
+
+        if !is_illegal {
+            sanitized.push(char);
+        }
+    }
+
+    sanitized
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,5 +211,14 @@ mod tests {
                 &patterns
             )
         );
+    }
+
+    #[test]
+    fn strip_illegal_chars_remove_illegal_chars() {
+        let result = strip_illegal_chars("Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen - Ryoushu no Youjo");
+        assert_eq!(result, "Honzuki no Gekokujou Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen - Ryoushu no Youjo");
+
+        let result = strip_illegal_chars("K-ON!!");
+        assert_eq!(result, "K-ON!!");
     }
 }
