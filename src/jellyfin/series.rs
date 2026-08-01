@@ -9,6 +9,7 @@ use walkdir::WalkDir;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ResolvedSeriesMetadata {
+    // always the first season title
     pub title: String,
     pub season: i64,
 }

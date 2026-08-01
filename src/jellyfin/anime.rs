@@ -72,6 +72,30 @@ where
         Ok(Some(season))
     }
 
+    pub fn resolve_first_season(&self, anime_id: u64) -> Result<Option<AnimeDetails>, AnimeResolverError> {
+        // first ensure this anime is not the first season, so it shouldn't have a prequel
+        if let None = self.resolve_prequel(anime_id)? {
+            return Ok(self.repository.find_by_id(anime_id)?)
+        }
+
+        let mut current_anime_id = anime_id;
+
+        while let Some(prequel) = self.resolve_prequel(current_anime_id)? {
+            current_anime_id = prequel.id;
+        }
+
+        let first_season = match self.repository.find_by_id(current_anime_id)? {
+            Some(season) => season,
+            None => return Ok(None),
+        };
+
+        if first_season.media_type == MediaType::Tv {
+            Ok(Some(first_season))
+        } else {
+            Ok(None)
+        }
+    }
+
     fn resolve_prequel(&self, anime_id: u64) -> Result<Option<AnimeDetails>, AnimeResolverError> {
         let anime = match self.repository.find_by_id(anime_id)? {
             Some(anime) => anime,
@@ -194,8 +218,13 @@ where
             return Err(AnimeResolverError::SeasonNotFound);
         }
 
+        let first_season = self.season_resolver.resolve_first_season(anime.id)?;
+        if season.is_none() {
+            return Err(AnimeResolverError::SeasonNotFound);
+        }
+
         Ok(ResolvedSeriesMetadata {
-            title: anime.title,
+            title: first_season.unwrap().title,
             season: season.unwrap(),
         })
     }
@@ -250,6 +279,18 @@ mod tests {
     }
 
     #[test]
+    fn anime_season_resolver_resolve_first_season() {
+        let resolver = AnimeSeasonResolver::new(FakeAnimeRepository::new());
+
+        let season = resolver.resolve_first_season(61203).unwrap();
+
+        assert_eq!(season.is_some(), true);
+        let season = season.unwrap();
+
+        assert_eq!(season.id, 30831);
+    }
+
+    #[test]
     fn anime_title_resolver_matches_an_alternative_title() {
         let resolver = AnimeTitleResolver::new(FakeAnimeRepository::new());
 
@@ -273,7 +314,7 @@ mod tests {
         assert_eq!(
             metadata,
             ResolvedSeriesMetadata {
-                title: "Kono Subarashii Sekai ni Shukufuku wo! 4".into(),
+                title: "Kono Subarashii Sekai ni Shukufuku wo!".into(),
                 season: 4,
             }
         );
