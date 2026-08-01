@@ -1,8 +1,10 @@
-use std::collections::HashMap;
-use std::sync::LazyLock;
-use reqwest::blocking::RequestBuilder;
+use log::warn;
 use reqwest::StatusCode;
+use reqwest::blocking::RequestBuilder;
 use serde::{Deserialize, Deserializer};
+use std::collections::HashMap;
+use std::fmt::{self, Display, Formatter};
+use std::sync::LazyLock;
 
 use crate::{Client, ClientError};
 
@@ -45,7 +47,7 @@ pub struct AnimeDetails {
     pub nsfw: String,
     pub created_at: String,
     pub updated_at: String,
-    pub media_type: String,
+    pub media_type: MediaType,
     pub status: String,
     pub genres: Vec<Genre>,
     pub my_list_status: Option<MyListStatus>,
@@ -62,6 +64,62 @@ pub struct AnimeDetails {
     pub recommendations: Vec<Recommendation>,
     pub studios: Vec<Studio>,
     pub statistics: Statistics,
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
+pub enum MediaType {
+    #[default]
+    Unknown,
+    Tv,
+    Ova,
+    Movie,
+    Special,
+    Ona,
+    Music,
+}
+
+impl MediaType {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Unknown => "unknown",
+            Self::Tv => "tv",
+            Self::Ova => "ova",
+            Self::Movie => "movie",
+            Self::Special => "special",
+            Self::Ona => "ona",
+            Self::Music => "music",
+        }
+    }
+}
+
+impl Display for MediaType {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for MediaType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        let media_type = match value.as_str() {
+            "unknown" => Self::Unknown,
+            "tv" => Self::Tv,
+            "ova" => Self::Ova,
+            "movie" => Self::Movie,
+            "special" => Self::Special,
+            "ona" => Self::Ona,
+            "music" => Self::Music,
+            _ => {
+                warn!("unknown MyAnimeList media type {value:?}; using unknown");
+                Self::Unknown
+            }
+        };
+
+        Ok(media_type)
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, Clone)]

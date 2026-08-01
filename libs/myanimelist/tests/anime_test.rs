@@ -1,6 +1,6 @@
 use std::env;
 
-use nenechi_myanimelist::Client;
+use nenechi_myanimelist::{Client, MediaType};
 
 fn load_env() {
     dotenvy::dotenv().expect("no se pudo cargar el fichero .env");
@@ -52,6 +52,33 @@ fn it_should_get_anime_by_id() {
     let anime = anime.unwrap();
     assert_eq!(anime.id, 31953);
     assert_eq!(anime.title, "New Game!");
-    assert_eq!(anime.media_type, "tv");
+    assert_eq!(anime.media_type, MediaType::Tv);
     assert_eq!(anime.num_episodes, 12);
+}
+
+#[test]
+fn it_should_deserialize_known_media_types() {
+    let cases = [
+        ("unknown", MediaType::Unknown),
+        ("tv", MediaType::Tv),
+        ("ova", MediaType::Ova),
+        ("movie", MediaType::Movie),
+        ("special", MediaType::Special),
+        ("ona", MediaType::Ona),
+        ("music", MediaType::Music),
+    ];
+
+    for (value, expected) in cases {
+        let media_type = serde_json::from_str::<MediaType>(&format!("\"{value}\""))
+            .expect("media type should deserialize");
+        assert_eq!(media_type, expected);
+    }
+}
+
+#[test]
+fn it_should_fallback_to_unknown_for_unrecognized_media_types() {
+    let media_type = serde_json::from_str::<MediaType>("\"unexpected\"")
+        .expect("unknown media type should deserialize");
+
+    assert_eq!(media_type, MediaType::Unknown);
 }
