@@ -1,10 +1,14 @@
-use crate::database::{DatabasePool, get_database_connection};
+use crate::database::{DatabasePool};
 use crate::schema::series_metadata;
 use diesel::prelude::*;
 use std::error::Error;
+use std::fmt::{self, Display, Formatter};
+use std::num::TryFromIntError;
 use std::path::Path;
 use std::sync::OnceLock;
 use uuid::Uuid;
+use crate::config::CliConfig;
+use crate::database;
 
 static SERIES_METADATA_REPOSITORY: OnceLock<SeriesMetadataRepository> = OnceLock::new();
 
@@ -17,18 +21,18 @@ pub struct SeriesMetadata {
 }
 
 impl SeriesMetadata {
-    pub fn new(title: String, path: String, season: Option<i64>) -> Result<Self, Box<dyn Error>> {
+    pub fn new(title: String, path: String, season: Option<i64>) -> Result<Self, String> {
         let title = title.trim().to_string();
         if title.is_empty() {
-            return Err("series title cannot be empty".into());
+            return Err("series title cannot be empty".to_string());
         }
         if path.trim().is_empty() {
-            return Err("series path cannot be empty".into());
+            return Err("series path cannot be empty".to_string());
         }
 
         let season = season.unwrap_or(1);
         if season == 0 {
-            return Err("series season must be greater than zero".into());
+            return Err("series season must be greater than zero".to_string());
         }
 
         Ok(Self {
@@ -39,7 +43,7 @@ impl SeriesMetadata {
         })
     }
 
-    pub fn from_directory(path: &Path, season: Option<i64>) -> Result<Self, Box<dyn Error>> {
+    pub fn from_directory(path: &Path, season: Option<i64>) -> Result<Self, String> {
         let title = path
             .file_name()
             .ok_or_else(|| format!("series path {} has no directory name", path.display()))?
@@ -65,8 +69,55 @@ struct SeriesMetadataTable {
     season: i32,
 }
 
+#[derive(Debug)]
+pub enum SeriesMetadataRepositoryError {
+    Connection(diesel::r2d2::PoolError),
+    Query(diesel::result::Error),
+    SeasonOutOfRange(TryFromIntError),
+}
+
+impl From<diesel::r2d2::PoolError> for SeriesMetadataRepositoryError {
+    fn from(error: diesel::r2d2::PoolError) -> Self {
+        Self::Connection(error)
+    }
+}
+
+impl From<diesel::result::Error> for SeriesMetadataRepositoryError {
+    fn from(error: diesel::result::Error) -> Self {
+        Self::Query(error)
+    }
+}
+
+impl From<TryFromIntError> for SeriesMetadataRepositoryError {
+    fn from(error: TryFromIntError) -> Self {
+        Self::SeasonOutOfRange(error)
+    }
+}
+
+impl Display for SeriesMetadataRepositoryError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Connection(error) => {
+                write!(formatter, "failed to get database connection: {error}")
+            }
+            Self::Query(error) => write!(formatter, "database query failed: {error}"),
+            Self::SeasonOutOfRange(_) => formatter.write_str("series season is out of range"),
+        }
+    }
+}
+
+impl Error for SeriesMetadataRepositoryError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Connection(error) => Some(error),
+            Self::Query(error) => Some(error),
+            Self::SeasonOutOfRange(error) => Some(error),
+        }
+    }
+}
+
 impl TryFrom<SeriesMetadata> for SeriesMetadataTable {
-    type Error = Box<dyn Error>;
+    type Error = SeriesMetadataRepositoryError;
 
     fn try_from(value: SeriesMetadata) -> Result<Self, Self::Error> {
         Ok(Self {
@@ -79,14 +130,14 @@ impl TryFrom<SeriesMetadata> for SeriesMetadataTable {
 }
 
 impl TryFrom<SeriesMetadataTable> for SeriesMetadata {
-    type Error = Box<dyn Error>;
+    type Error = SeriesMetadataRepositoryError;
 
     fn try_from(value: SeriesMetadataTable) -> Result<Self, Self::Error> {
         Ok(Self {
             id: value.id,
             title: value.title,
             path: value.path,
-            season: i64::try_from(value.season)?,
+            season: i64::from(value.season),
         })
     }
 }
@@ -102,11 +153,18 @@ impl SeriesMetadataRepository {
         }
     }
 
-    pub fn get_instance() -> &'static Self {
-        SERIES_METADATA_REPOSITORY.get_or_init(|| Self::new(get_database_connection()))
+    pub fn from_config(config: &CliConfig) -> Self {
+        Self::new(&database::create_db_connection(&config.database))
     }
 
-    pub fn find_by_path(&self, path: &str) -> Result<Option<SeriesMetadata>, Box<dyn Error>> {
+    pub fn get_instance() -> &'static Self {
+        SERIES_METADATA_REPOSITORY.get_or_init(|| Self::new(database::get_database_connection()))
+    }
+
+    pub fn find_by_path(
+        &self,
+        path: &str,
+    ) -> Result<Option<SeriesMetadata>, SeriesMetadataRepositoryError> {
         let mut connection = self.connection_pool.get()?;
         let result = series_metadata::table
             .filter(series_metadata::path.eq(path))
@@ -116,7 +174,7 @@ impl SeriesMetadataRepository {
         result.map(TryInto::try_into).transpose()
     }
 
-    pub fn save(&self, metadata: &SeriesMetadata) -> Result<(), Box<dyn Error>> {
+    pub fn save(&self, metadata: &SeriesMetadata) -> Result<(), SeriesMetadataRepositoryError> {
         let mut connection = self.connection_pool.get()?;
         let table_model: SeriesMetadataTable = metadata.clone().try_into()?;
 
@@ -149,5 +207,30 @@ mod tests {
     #[test]
     fn rejects_season_zero() {
         assert!(SeriesMetadata::new("Example".into(), "/series/Example".into(), Some(0)).is_err());
+    }
+
+    #[test]
+    fn maps_diesel_query_errors_to_repository_errors() {
+        let error = SeriesMetadataRepositoryError::from(diesel::result::Error::NotFound);
+
+        assert!(matches!(
+            error,
+            SeriesMetadataRepositoryError::Query(diesel::result::Error::NotFound)
+        ));
+    }
+
+    #[test]
+    fn rejects_seasons_that_do_not_fit_in_the_database_column() {
+        let metadata = SeriesMetadata::new(
+            "Example".into(),
+            "/series/Example".into(),
+            Some(i64::from(i32::MAX) + 1),
+        )
+        .unwrap();
+
+        assert!(matches!(
+            SeriesMetadataTable::try_from(metadata),
+            Err(SeriesMetadataRepositoryError::SeasonOutOfRange(_))
+        ));
     }
 }

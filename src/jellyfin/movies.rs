@@ -1,21 +1,20 @@
 use crate::fs::symlink_file;
 use crate::jellyfin::config::{TargetConfig, TargetType};
-use std::error::Error;
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
-pub fn organize(target: &TargetConfig) -> Result<usize, Box<dyn Error>> {
+pub fn organize(target: &TargetConfig) -> Result<usize, String> {
     if target.target_type != TargetType::Movies {
-        return Err(format!("Jellyfin target {:?} is not a movies target", target.name).into());
+        return Err(format!("Jellyfin target {:?} is not a movies target", target.name));
     }
     target.validate()?;
     target.validate_source()?;
-    fs::create_dir_all(&target.destination)?;
+    fs::create_dir_all(&target.destination).map_err(|e| e.to_string())?;
 
     let mut links = 0;
-    for entry in fs::read_dir(&target.source)? {
-        let entry = entry?;
+    for entry in fs::read_dir(&target.source).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
 
         if path.is_symlink() || target.ignores(&path) {
@@ -36,7 +35,7 @@ pub fn organize(target: &TargetConfig) -> Result<usize, Box<dyn Error>> {
     Ok(links)
 }
 
-fn organize_standalone_movie(target: &TargetConfig, path: &Path) -> Result<(), Box<dyn Error>> {
+fn organize_standalone_movie(target: &TargetConfig, path: &Path) -> Result<(), String> {
     let destination = target
         .destination
         .join(file_stem(path)?)
@@ -47,7 +46,7 @@ fn organize_standalone_movie(target: &TargetConfig, path: &Path) -> Result<(), B
 fn organize_movie_directory(
     target: &TargetConfig,
     movie_directory: &Path,
-) -> Result<usize, Box<dyn Error>> {
+) -> Result<usize, String> {
     let movie_name = file_name(movie_directory)?;
     let mut links = 0;
 
@@ -56,12 +55,12 @@ fn organize_movie_directory(
         .into_iter()
         .filter_entry(|entry| !target.ignores(entry.path()))
     {
-        let entry = entry?;
+        let entry = entry.map_err(|e| e.to_string())?;
         if !entry.file_type().is_file() || !target.includes(entry.path()) {
             continue;
         }
 
-        let relative = entry.path().strip_prefix(movie_directory)?;
+        let relative = entry.path().strip_prefix(movie_directory).map_err(|e| e.to_string())?;
         let destination = target.destination.join(movie_name).join(relative);
         create_link(entry.path(), &destination)?;
         links += 1;
@@ -70,21 +69,22 @@ fn organize_movie_directory(
     Ok(links)
 }
 
-fn create_link(source: &Path, destination: &Path) -> Result<(), Box<dyn Error>> {
+fn create_link(source: &Path, destination: &Path) -> Result<(), String> {
     let parent = destination
         .parent()
         .ok_or_else(|| format!("destination {} has no parent", destination.display()))?;
-    fs::create_dir_all(parent)?;
-    let source = fs::canonicalize(source)?;
-    symlink_file(&source, destination)
+    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let source = fs::canonicalize(source).map_err(|e| e.to_string())?;
+    symlink_file(&source, destination).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
-fn file_name(path: &Path) -> Result<&std::ffi::OsStr, Box<dyn Error>> {
+fn file_name(path: &Path) -> Result<&std::ffi::OsStr, String> {
     path.file_name()
         .ok_or_else(|| format!("path {} has no file name", path.display()).into())
 }
 
-fn file_stem(path: &Path) -> Result<&std::ffi::OsStr, Box<dyn Error>> {
+fn file_stem(path: &Path) -> Result<&std::ffi::OsStr, String> {
     path.file_stem()
         .ok_or_else(|| format!("path {} has no file stem", path.display()).into())
 }

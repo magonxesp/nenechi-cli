@@ -1,18 +1,7 @@
-mod anime;
-mod client;
-mod commands;
-mod config;
-mod database;
-mod fs;
-mod jellyfin;
-mod logging;
-mod schema;
-mod wallpapers;
-
-use crate::config::CliConfig;
 use clap::Parser;
-use commands::{Commands, execute_command};
-use config::read_config;
+use nenechi_cli::config::{CliConfig};
+use nenechi_cli::commands::{Commands, execute_command};
+use nenechi_cli::logging;
 
 #[derive(Debug, Parser)]
 #[command(name = "nennechi-cli")]

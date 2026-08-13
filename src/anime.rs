@@ -6,6 +6,7 @@ use nenechi_myanimelist::{Anime, AnimeDetails, Client, ClientError};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use crate::config::CliConfig;
 
 #[derive(Debug)]
 pub enum AnimeRepositoryError {
@@ -113,7 +114,13 @@ impl CachedAnimeRepository {
         }
     }
 
-    pub fn get_instance() -> Result<CachedAnimeRepository, AnimeRepositoryError> {
+    pub fn from_config(config: &CliConfig) -> Result<Self, AnimeRepositoryError> {
+        let client = MyAnimeListClient::create(&config).map_err(AnimeRepositoryError::CreateInstance)?;
+        let repository = CachedAnimeRepository::new(client);
+        Ok(repository)
+    }
+
+    pub fn get_instance() -> Result<Self, AnimeRepositoryError> {
         if let Some(repository) = CACHED_ANIME_REPOSITORY.get() {
             return Ok(repository.clone());
         }

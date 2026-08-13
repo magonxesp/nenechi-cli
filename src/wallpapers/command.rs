@@ -116,7 +116,7 @@ fn create_wallpaper_aspect_ratio_symlinks(
     let original_file_name = unwrap_optional_os_str(original.file_name())?;
     let destination_symlink = &aspect_ratio_directory.join(&original_file_name);
     let destination_symlink = Path::new(destination_symlink);
-    symlink_file(original, destination_symlink)
+    symlink_file(original, destination_symlink).map_err(Box::from)
 }
 
 fn create_wallpaper_tags_symlinks(

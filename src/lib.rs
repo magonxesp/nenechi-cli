@@ -1,0 +1,10 @@
+pub mod anime;
+pub mod client;
+pub mod commands;
+pub mod config;
+pub mod database;
+pub mod fs;
+pub mod jellyfin;
+pub mod logging;
+pub mod schema;
+pub mod wallpapers;

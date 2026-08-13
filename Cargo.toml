@@ -30,6 +30,7 @@ glob = "0.3.2"
 regex = "1.11"
 uuid = { version = "1.8.0", features = ["v4", "v7"] }
 serial_test = "3.2.0"
+dotenvy = "0.15.7"
 
 [dev-dependencies]
 tempfile = "3.20"

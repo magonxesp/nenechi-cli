@@ -1,6 +1,6 @@
 use glob::Pattern;
 use log::{info, warn};
-use std::env;
+use std::{env, io};
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fs;
@@ -52,9 +52,9 @@ pub fn unwrap_optional_os_str(os_str: Option<&OsStr>) -> Result<String, Box<dyn 
 
 /// create a symlink for a file
 /// if the link exists, it skips the link creation
-pub fn symlink_file(original: &Path, link: &Path) -> Result<(), Box<dyn Error>> {
+pub fn symlink_file(original: &Path, link: &Path) -> io::Result<()> {
     if !original.is_file() {
-        return Err("original path is not a file".into());
+        return Err(io::Error::new(ErrorKind::IsADirectory, "not a file"));
     }
 
     if fs::symlink_metadata(link).is_ok() {

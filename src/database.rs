@@ -25,7 +25,7 @@ pub fn get_database_connection() -> &'static DatabasePool {
     })
 }
 
-fn create_db_connection(config: &DatabaseConfig) -> DatabasePool {
+pub fn create_db_connection(config: &DatabaseConfig) -> DatabasePool {
     let path = config.path();
     if let None = &path {
         warn!("database path cannot be resolved: {}", config.file);

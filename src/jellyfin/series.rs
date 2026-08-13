@@ -1,11 +1,13 @@
 use crate::fs::symlink_file;
-use crate::jellyfin::config::{SeriesCategory, TargetConfig, TargetType};
+use crate::jellyfin::config::{SeriesCategory, SeriesConfig, TargetConfig, TargetType};
 use crate::jellyfin::pattern::EpisodePatterns;
-use log::warn;
+use log::{debug, warn};
 use std::error::Error;
 use std::fs;
+use std::fs::File;
 use std::path::{Component, Path, PathBuf};
 use walkdir::WalkDir;
+use crate::jellyfin::series_metadata::{SeriesMetadata, SeriesMetadataRepository};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ResolvedSeriesMetadata {
@@ -25,13 +27,15 @@ pub trait SeriesMetadataResolver {
 pub fn organize(
     target: &TargetConfig,
     metadata_resolver: &impl SeriesMetadataResolver,
-) -> Result<usize, Box<dyn Error>> {
+    metadata_repository: &SeriesMetadataRepository,
+) -> Result<usize, String> {
     if target.target_type != TargetType::Series {
-        return Err(format!("Jellyfin target {:?} is not a series target", target.name).into());
+        return Err(format!("Jellyfin target {:?} is not a series target", target.name));
     }
+
     target.validate()?;
     target.validate_source()?;
-    fs::create_dir_all(&target.destination)?;
+    fs::create_dir_all(&target.destination).map_err(|e| e.to_string())?;
 
     let series_config = target.series.as_ref().ok_or_else(|| {
         format!(
@@ -42,70 +46,52 @@ pub fn organize(
     let patterns = EpisodePatterns::compile(&series_config.episode)?;
     let mut links = 0;
 
-    for entry in fs::read_dir(&target.source)? {
-        let entry = entry?;
+    for entry in fs::read_dir(&target.source).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
         let series_directory = entry.path();
         if !series_directory.is_dir()
             || series_directory.is_symlink()
             || target.ignores(&series_directory)
         {
+            debug!("ignoring {:?}", series_directory);
             continue;
         }
 
-        let files = media_files(target, &series_directory)?;
-        if files.is_empty() {
-            continue;
-        }
-
-        let metadata = match metadata_resolver.resolve(&series_directory, &series_config.category) {
+        let metadata = match series_metadata(
+            &series_directory,
+            &series_config,
+            &metadata_repository,
+            metadata_resolver,
+        ) {
             Ok(metadata) => metadata,
-            Err(error) => {
-                warn!(
-                    "failed resolving metadata for series {}: {error}",
-                    series_directory.display()
-                );
+            Err(err) => {
+                warn!("failed to get metadata for {:?}: {:?}", series_directory, err);
                 continue;
             }
         };
-        if let Err(error) = validate_metadata(&metadata) {
-            warn!(
-                "invalid metadata for series {}: {error}",
-                series_directory.display()
-            );
-            continue;
-        }
-        let episodes = match patterns.number_files(&files) {
-            Ok(episodes) => episodes,
-            Err(error) => {
-                warn!(
-                    "failed numbering episodes for series {}: {error}",
-                    series_directory.display()
-                );
-                continue;
-            }
-        };
+
+        debug!("scanning {:?}", series_directory);
+        let files = media_files(target, &series_directory);
+
         let season_directory = target
             .destination
             .join(&metadata.title)
             .join(format!("Season {:02}", metadata.season));
-        fs::create_dir_all(&season_directory)?;
+        fs::create_dir_all(&season_directory).map_err(|e| e.to_string())?;
 
-        for episode in episodes {
-            let Some(extension) = episode.path.extension() else {
-                warn!(
-                    "episode file {} has no extension; skipping it",
-                    episode.path.display()
-                );
-                continue;
-            };
-            let extension = extension.to_string_lossy();
-            let file_name = format!(
-                "{} - S{:02}E{:02}.{}",
-                metadata.title, metadata.season, episode.number, extension
+        for file in files {
+            let result = create_episode_symlink(
+                &file,
+                &season_directory,
+                &metadata,
+                &patterns
             );
-            let destination = season_directory.join(file_name);
-            let source = fs::canonicalize(&episode.path)?;
-            symlink_file(&source, &destination)?;
+
+            if let Err(err) = result {
+                warn!("failed to create symlink for series {:?}: {err}", series_directory);
+                continue;
+            }
+
             links += 1;
         }
     }
@@ -113,27 +99,71 @@ pub fn organize(
     Ok(links)
 }
 
-fn media_files(target: &TargetConfig, directory: &Path) -> Result<Vec<PathBuf>, Box<dyn Error>> {
-    let mut files = Vec::new();
-    for entry in WalkDir::new(directory)
+fn create_episode_symlink(
+    episode_path: &PathBuf,
+    season_directory: &PathBuf,
+    metadata: &SeriesMetadata,
+    patterns: &EpisodePatterns
+) -> Result<(), String> {
+    let extension = episode_path.extension()
+        .ok_or_else(|| format!("episode file {:?} has no extension", episode_path))?;
+
+    let file_name = episode_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| format!("episode file {:?} has no filename", episode_path))?;
+
+    let extension = extension.to_string_lossy();
+    let episode_number = patterns.extract(file_name)?
+        .ok_or_else(|| format!("episode file {:?} has no episode_number", episode_path))?;
+
+    let file_name = format!(
+        "{} - S{:02}E{:02}.{}",
+        metadata.title, metadata.season, episode_number, extension
+    );
+
+    let destination = season_directory.join(file_name);
+    let source = fs::canonicalize(&episode_path.as_path())
+        .map_err(|e| format!("error canonicalizing file {:?}: {}", episode_path, e))?;
+    symlink_file(&source, &destination)
+        .map_err(|e| format!("error symlinking file {:?}: {}", episode_path, e))?;
+
+    Ok(())
+}
+
+fn filter_media_entry(entry: &walkdir::DirEntry, target: &TargetConfig) -> bool {
+    let path = entry.path();
+
+    if !entry.file_type().is_file() {
+        debug!("ignoring target {:?}: is not a file", path);
+        return false;
+    }
+
+    if !target.includes(path) {
+        debug!("ignoring target {:?}: is not wanted or included", path);
+        return false;
+    }
+
+    debug!("found target {:?}", path);
+    true
+}
+
+fn media_files(target: &TargetConfig, directory: &Path) -> impl Iterator<Item = PathBuf> {
+    WalkDir::new(directory)
         .follow_links(false)
         .into_iter()
         .filter_entry(|entry| !target.ignores(entry.path()))
-    {
-        let entry = entry?;
-        if entry.file_type().is_file() && target.includes(entry.path()) {
-            files.push(entry.into_path());
-        }
-    }
-    Ok(files)
+        .filter_map(Result::ok)
+        .filter(|entry| filter_media_entry(entry, target))
+        .map(|entry| entry.into_path())
 }
 
-fn validate_metadata(metadata: &ResolvedSeriesMetadata) -> Result<(), Box<dyn Error>> {
+fn validate_metadata(metadata: &ResolvedSeriesMetadata) -> Result<(), String> {
     if metadata.title.trim().is_empty() {
-        return Err("resolved series title cannot be empty".into());
+        return Err("resolved series title cannot be empty".to_string());
     }
     if metadata.season == 0 {
-        return Err("resolved series season must be greater than zero".into());
+        return Err("resolved series season must be greater than zero".to_string());
     }
 
     let path = Path::new(&metadata.title);
@@ -150,197 +180,25 @@ fn validate_metadata(metadata: &ResolvedSeriesMetadata) -> Result<(), Box<dyn Er
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::jellyfin::config::{EpisodeConfig, EpisodeFallback, SeriesConfig, TargetConfig};
-    use tempfile::tempdir;
-
-    struct FixedResolver;
-
-    impl SeriesMetadataResolver for FixedResolver {
-        fn resolve(
-            &self,
-            _source_directory: &Path,
-            _category: &SeriesCategory,
-        ) -> Result<ResolvedSeriesMetadata, Box<dyn Error>> {
-            Ok(ResolvedSeriesMetadata {
-                title: "Example: Anime?".into(),
-                season: 2,
-            })
-        }
+fn series_metadata(
+    path: &Path,
+    config: &SeriesConfig,
+    repository: &SeriesMetadataRepository,
+    resolver: &impl SeriesMetadataResolver
+) -> Result<SeriesMetadata, String> {
+    let path_str = path.to_string_lossy().to_string();
+    let metadata = repository.find_by_path(path_str.as_str()).map_err(|e| e.to_string())?;
+    if let Some(metadata) = metadata {
+        return Ok(metadata);
     }
 
-    struct ConditionalResolver;
+    let metadata = match resolver.resolve(&path, &config.category) {
+        Ok(metadata) => metadata,
+        Err(error) => return Err(format!("failed resolving metadata for series {:?}: {error}", path))
+    };
 
-    impl SeriesMetadataResolver for ConditionalResolver {
-        fn resolve(
-            &self,
-            source_directory: &Path,
-            _category: &SeriesCategory,
-        ) -> Result<ResolvedSeriesMetadata, Box<dyn Error>> {
-            if source_directory.ends_with("Broken") {
-                return Err("metadata resolution failed".into());
-            }
-
-            Ok(ResolvedSeriesMetadata {
-                title: "Working".into(),
-                season: 1,
-            })
-        }
-    }
-
-    #[test]
-    fn validates_resolved_metadata() {
-        assert!(
-            validate_metadata(&ResolvedSeriesMetadata {
-                title: String::new(),
-                season: 1,
-            })
-            .is_err()
-        );
-        assert!(
-            validate_metadata(&ResolvedSeriesMetadata {
-                title: "Example".into(),
-                season: 0,
-            })
-            .is_err()
-        );
-        assert!(
-            validate_metadata(&ResolvedSeriesMetadata {
-                title: "../unsafe".into(),
-                season: 1,
-            })
-            .is_err()
-        );
-        assert!(
-            validate_metadata(
-                &FixedResolver
-                    .resolve(Path::new("Example"), &SeriesCategory::Anime,)
-                    .unwrap()
-            )
-            .is_ok()
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn organizes_a_series_using_resolved_metadata_and_filesystem_order() {
-        let temporary = tempdir().unwrap();
-        let source = temporary.path().join("source");
-        let series_source = source.join("Downloaded name");
-        let destination = temporary.path().join("destination");
-        fs::create_dir_all(&series_source).unwrap();
-        let episode_two = series_source.join("show 2.mkv");
-        let episode_ten = series_source.join("show 10.mkv");
-        fs::write(&episode_ten, b"ten").unwrap();
-        fs::write(&episode_two, b"two").unwrap();
-
-        let target = TargetConfig {
-            name: "anime".into(),
-            target_type: TargetType::Series,
-            source,
-            destination: destination.clone(),
-            series: Some(SeriesConfig {
-                category: SeriesCategory::Anime,
-                episode: EpisodeConfig {
-                    patterns: Vec::new(),
-                    fallback: EpisodeFallback::FilesystemOrder,
-                    start_at: 1,
-                },
-            }),
-            include: vec!["*.mkv".into()],
-            ignore: Vec::new(),
-        };
-
-        let filesystem_order = media_files(&target, &series_source).unwrap();
-        assert_eq!(organize(&target, &FixedResolver).unwrap(), 2);
-        let season = destination.join("Example: Anime?").join("Season 02");
-        assert_eq!(
-            fs::read_link(season.join("Example: Anime? - S02E01.mkv")).unwrap(),
-            fs::canonicalize(&filesystem_order[0]).unwrap()
-        );
-        assert_eq!(
-            fs::read_link(season.join("Example: Anime? - S02E02.mkv")).unwrap(),
-            fs::canonicalize(&filesystem_order[1]).unwrap()
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn continues_with_the_next_series_when_one_fails() {
-        let temporary = tempdir().unwrap();
-        let source = temporary.path().join("source");
-        let broken_series = source.join("Broken");
-        let working_series = source.join("Working");
-        let destination = temporary.path().join("destination");
-        fs::create_dir_all(&broken_series).unwrap();
-        fs::create_dir_all(&working_series).unwrap();
-        fs::write(broken_series.join("episode.mkv"), b"broken").unwrap();
-        let working_episode = working_series.join("episode.mkv");
-        fs::write(&working_episode, b"working").unwrap();
-
-        let target = TargetConfig {
-            name: "anime".into(),
-            target_type: TargetType::Series,
-            source,
-            destination: destination.clone(),
-            series: Some(SeriesConfig {
-                category: SeriesCategory::Anime,
-                episode: EpisodeConfig {
-                    patterns: Vec::new(),
-                    fallback: EpisodeFallback::FilesystemOrder,
-                    start_at: 1,
-                },
-            }),
-            include: vec!["*.mkv".into()],
-            ignore: Vec::new(),
-        };
-
-        assert_eq!(organize(&target, &ConditionalResolver).unwrap(), 1);
-        assert_eq!(
-            fs::read_link(
-                destination
-                    .join("Working")
-                    .join("Season 01")
-                    .join("Working - S01E01.mkv")
-            )
-            .unwrap(),
-            fs::canonicalize(working_episode).unwrap()
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn stops_when_a_series_filesystem_operation_fails() {
-        let temporary = tempdir().unwrap();
-        let source = temporary.path().join("source");
-        let series_source = source.join("Series");
-        let destination = temporary.path().join("destination");
-        fs::create_dir_all(&series_source).unwrap();
-        fs::create_dir(&destination).unwrap();
-        fs::write(series_source.join("episode.mkv"), b"episode").unwrap();
-
-        // This file prevents creation of the resolved series directory.
-        fs::write(destination.join("Example: Anime?"), b"blocking file").unwrap();
-
-        let target = TargetConfig {
-            name: "anime".into(),
-            target_type: TargetType::Series,
-            source,
-            destination,
-            series: Some(SeriesConfig {
-                category: SeriesCategory::Anime,
-                episode: EpisodeConfig {
-                    patterns: Vec::new(),
-                    fallback: EpisodeFallback::FilesystemOrder,
-                    start_at: 1,
-                },
-            }),
-            include: vec!["*.mkv".into()],
-            ignore: Vec::new(),
-        };
-
-        assert!(organize(&target, &FixedResolver).is_err());
-    }
+    validate_metadata(&metadata)?;
+    let metadata = SeriesMetadata::new(metadata.title, path_str, Some(metadata.season))?;
+    repository.save(&metadata).map_err(|e| e.to_string())?;
+    Ok(metadata)
 }

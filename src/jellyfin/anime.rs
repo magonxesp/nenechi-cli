@@ -6,6 +6,7 @@ use nenechi_myanimelist::{AnimeDetails, MediaType, RelationType};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::path::Path;
+use crate::config::CliConfig;
 use crate::fs::strip_illegal_chars;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -187,6 +188,10 @@ where
 impl AnimeResolver<CachedAnimeRepository> {
     pub fn build() -> Result<Self, AnimeResolverError> {
         Ok(Self::new(CachedAnimeRepository::get_instance()?))
+    }
+
+    pub fn from_config(config: &CliConfig) -> Result<Self, AnimeResolverError> {
+        Ok(Self::new(CachedAnimeRepository::from_config(config)?))
     }
 }
 

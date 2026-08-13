@@ -16,11 +16,6 @@ jellyfin:
             - '(?i)(?:EP?|Episode)[ ._-]*(?<episode>\d{1,3})'
             - '[ ._-](?<episode>\d{1,3})[ ._-]'
 
-          # Si algun fichero no coincide, se conserva el orden devuelto por
-          # el sistema de archivos y se numeran todos los episodios.
-          fallback: filesystem_order
-          start_at: 1
-
       include:
         - '*.mkv'
         - '*.mp4'
@@ -42,8 +37,6 @@ jellyfin:
           patterns:
             - '(?i)S\d{1,2}E(?<episode>\d{1,3})'
             - '(?i)(?:EP?|Episode)[ ._-]*(?<episode>\d{1,3})'
-          fallback: filesystem_order
-          start_at: 1
 
       include:
         - '*.mkv'
@@ -61,8 +54,6 @@ jellyfin:
           patterns:
             - '(?i)S\d{1,2}E(?<episode>\d{1,3})'
             - '(?i)(?:EP?|Episode)[ ._-]*(?<episode>\d{1,3})'
-          fallback: filesystem_order
-          start_at: 1
 
       include:
         - '*.mkv'

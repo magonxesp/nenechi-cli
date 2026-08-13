@@ -223,7 +223,7 @@ fn mount(
                     repository,
                     anime_resolver,
                 };
-                series::organize(target, &resolver)
+                series::organize(target, &resolver, &repository)
             }
             TargetType::Movies => movies::organize(target),
         };
@@ -262,7 +262,7 @@ fn anime_resolver(config: &JellyfinConfig) -> Result<Option<impl SeriesMetadataR
 mod tests {
     use super::*;
     use crate::database::tests::test_db_connection;
-    use crate::jellyfin::config::{EpisodeConfig, EpisodeFallback, SeriesCategory, SeriesConfig};
+    use crate::jellyfin::config::{EpisodeConfig, SeriesCategory, SeriesConfig};
     use serial_test::serial;
     use tempfile::tempdir;
 
@@ -288,8 +288,6 @@ mod tests {
                 category: SeriesCategory::Animation,
                 episode: EpisodeConfig {
                     patterns: Vec::new(),
-                    fallback: EpisodeFallback::FilesystemOrder,
-                    start_at: 1,
                 },
             }),
             include: vec!["*.mkv".into()],
@@ -408,8 +406,6 @@ mod tests {
                 category: SeriesCategory::Anime,
                 episode: EpisodeConfig {
                     patterns: Vec::new(),
-                    fallback: EpisodeFallback::FilesystemOrder,
-                    start_at: 1,
                 },
             }),
             include: vec!["*.mkv".into()],
@@ -452,8 +448,6 @@ mod tests {
                     category: SeriesCategory::Anime,
                     episode: EpisodeConfig {
                         patterns: Vec::new(),
-                        fallback: EpisodeFallback::FilesystemOrder,
-                        start_at: 1,
                     },
                 }),
                 include: vec!["*.mkv".into()],
@@ -501,8 +495,6 @@ mod tests {
                 category: SeriesCategory::Anime,
                 episode: EpisodeConfig {
                     patterns: Vec::new(),
-                    fallback: EpisodeFallback::FilesystemOrder,
-                    start_at: 1,
                 },
             }),
             include: vec!["*.mkv".into()],
@@ -548,8 +540,6 @@ mod tests {
                 category: SeriesCategory::Animation,
                 episode: EpisodeConfig {
                     patterns: Vec::new(),
-                    fallback: EpisodeFallback::FilesystemOrder,
-                    start_at: 1,
                 },
             })
         };
@@ -585,65 +575,6 @@ mod tests {
                 .find_by_path(path.to_str().unwrap())
                 .unwrap()
                 .is_some()
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    #[serial]
-    fn mounts_a_series_using_the_index_and_indexes_it_when_missing() {
-        let temporary = tempdir().unwrap();
-        let source = temporary.path().join("source");
-        let destination = temporary.path().join("destination");
-        let series_directory = source.join("Downloaded Anime Title");
-        fs::create_dir_all(&series_directory).unwrap();
-        let episode = series_directory.join("episode.mkv");
-        fs::write(&episode, b"episode").unwrap();
-
-        let config = JellyfinConfig {
-            targets: vec![TargetConfig {
-                name: "anime".into(),
-                target_type: TargetType::Series,
-                source,
-                destination: destination.clone(),
-                series: Some(SeriesConfig {
-                    category: SeriesCategory::Anime,
-                    episode: EpisodeConfig {
-                        patterns: Vec::new(),
-                        fallback: EpisodeFallback::FilesystemOrder,
-                        start_at: 1,
-                    },
-                }),
-                include: vec!["*.mkv".into()],
-                ignore: Vec::new(),
-            }],
-        };
-        let repository = SeriesMetadataRepository::new(test_db_connection());
-
-        assert_eq!(
-            mount(&config, &repository, Some(&FixedAnimeResolver)).unwrap(),
-            1
-        );
-        let link = destination
-            .join("Canonical Anime Title")
-            .join("Season 03")
-            .join("Canonical Anime Title - S03E01.mkv");
-        assert_eq!(
-            fs::read_link(&link).unwrap(),
-            fs::canonicalize(&episode).unwrap()
-        );
-
-        let indexed_path = fs::canonicalize(series_directory).unwrap();
-        let metadata = repository
-            .find_by_path(indexed_path.to_str().unwrap())
-            .unwrap()
-            .unwrap();
-        assert_eq!(metadata.title, "Canonical Anime Title");
-        assert_eq!(metadata.season, 3);
-
-        assert_eq!(
-            mount(&config, &repository, Some(&UnexpectedAnimeResolver)).unwrap(),
-            1
         );
     }
 }

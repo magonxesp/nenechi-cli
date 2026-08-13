@@ -9,8 +9,8 @@ const CONFIG_FILE_NAME: &str = "jellyfin.yaml";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct JellyfinConfigRoot {
-    jellyfin: JellyfinConfig,
+pub struct JellyfinConfigRoot {
+    pub jellyfin: JellyfinConfig,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -216,33 +216,14 @@ pub enum SeriesCategory {
 pub struct EpisodeConfig {
     #[serde(default)]
     pub patterns: Vec<String>,
-    pub fallback: EpisodeFallback,
-    #[serde(default = "default_episode_start")]
-    pub start_at: u32,
 }
 
 impl EpisodeConfig {
     fn validate(&self, target_name: &str) -> Result<(), String> {
-        if self.start_at == 0 {
-            return Err(format!(
-                "jellyfin target {:?} series.episode.start_at must be greater than zero",
-                target_name
-            ));
-        }
         crate::jellyfin::pattern::EpisodePatterns::compile(self)
             .map(|_| ())
             .map_err(|error| format!("jellyfin target {:?}: {error}", target_name))
     }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum EpisodeFallback {
-    FilesystemOrder,
-}
-
-fn default_episode_start() -> u32 {
-    1
 }
 
 #[cfg(test)]
@@ -266,8 +247,6 @@ mod tests {
     fn rejects_an_episode_pattern_without_the_named_capture() {
         let episode = EpisodeConfig {
             patterns: vec![r"EP(\d+)".into()],
-            fallback: EpisodeFallback::FilesystemOrder,
-            start_at: 1,
         };
 
         assert!(episode.validate("anime").is_err());
