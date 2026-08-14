@@ -22,6 +22,7 @@ log = "0.4"
 fern = "0.7"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
+serde_with = { version = "3", features = ["base64"] }
 walkdir = "2.3"
 diesel = { version = "2.2.0", features = ["sqlite", "serde_json", "r2d2"] }
 diesel_migrations = "2.2.0"
@@ -31,6 +32,8 @@ regex = "1.11"
 uuid = { version = "1.8.0", features = ["v4", "v7"] }
 serial_test = "3.2.0"
 dotenvy = "0.15.7"
+reqwest = { version = "0.13.4", features = ["blocking"] }
+quick-xml = { version = "0.41.0", features = ["serialize"] }
 
 [dev-dependencies]
 tempfile = "3.20"

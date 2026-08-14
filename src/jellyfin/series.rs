@@ -1,34 +1,15 @@
 use crate::fs::symlink_file;
-use crate::jellyfin::config::{SeriesCategory, SeriesConfig, TargetConfig, TargetType};
+use crate::jellyfin::config::{TargetConfig, TargetType};
+use crate::jellyfin::metadata::{SeriesNfo, write_poster};
 use crate::jellyfin::pattern::EpisodePatterns;
+use crate::media;
+use crate::media::SeriesMetadata;
 use log::{debug, warn};
-use std::error::Error;
 use std::fs;
-use std::fs::File;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-use crate::jellyfin::series_metadata::{SeriesMetadata, SeriesMetadataRepository};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ResolvedSeriesMetadata {
-    // always the first season title
-    pub title: String,
-    pub season: i64,
-}
-
-pub trait SeriesMetadataResolver {
-    fn resolve(
-        &self,
-        source_directory: &Path,
-        category: &SeriesCategory,
-    ) -> Result<ResolvedSeriesMetadata, Box<dyn Error>>;
-}
-
-pub fn organize(
-    target: &TargetConfig,
-    metadata_resolver: &impl SeriesMetadataResolver,
-    metadata_repository: &SeriesMetadataRepository,
-) -> Result<usize, String> {
+pub fn organize(target: &TargetConfig) -> Result<usize, String> {
     if target.target_type != TargetType::Series {
         return Err(format!("Jellyfin target {:?} is not a series target", target.name));
     }
@@ -57,19 +38,13 @@ pub fn organize(
             continue;
         }
 
-        let metadata = match series_metadata(
-            &series_directory,
-            &series_config,
-            &metadata_repository,
-            metadata_resolver,
-        ) {
-            Ok(metadata) => metadata,
-            Err(err) => {
-                warn!("failed to get metadata for {:?}: {:?}", series_directory, err);
-                continue;
-            }
-        };
+        let metadata = media::read_series_metadata_from_path(&series_directory);
+        if let Err(err) = &metadata {
+            warn!("error reading metadata: {}", err);
+            continue;
+        }
 
+        let metadata = metadata?;
         debug!("scanning {:?}", series_directory);
         let files = media_files(target, &series_directory);
 
@@ -78,6 +53,23 @@ pub fn organize(
             .join(&metadata.title)
             .join(format!("Season {:02}", metadata.season));
         fs::create_dir_all(&season_directory).map_err(|e| e.to_string())?;
+
+        let nfo = SeriesNfo::from(metadata.clone());
+
+        if metadata.season == 1 {
+            nfo.write(&series_directory, false)?;
+        } else {
+            nfo.write(&season_directory, true)?;
+        }
+
+        if let Some(cover) = &metadata.cover {
+            if metadata.season == 1 {
+                write_poster(&series_directory, &cover)?;
+                write_poster(&season_directory, &cover)?;
+            } else {
+                write_poster(&season_directory, &cover)?;
+            }
+        }
 
         for file in files {
             let result = create_episode_symlink(
@@ -156,49 +148,4 @@ fn media_files(target: &TargetConfig, directory: &Path) -> impl Iterator<Item = 
         .filter_map(Result::ok)
         .filter(|entry| filter_media_entry(entry, target))
         .map(|entry| entry.into_path())
-}
-
-fn validate_metadata(metadata: &ResolvedSeriesMetadata) -> Result<(), String> {
-    if metadata.title.trim().is_empty() {
-        return Err("resolved series title cannot be empty".to_string());
-    }
-    if metadata.season == 0 {
-        return Err("resolved series season must be greater than zero".to_string());
-    }
-
-    let path = Path::new(&metadata.title);
-    if path.components().count() != 1
-        || !matches!(path.components().next(), Some(Component::Normal(_)))
-    {
-        return Err(format!(
-            "resolved series title {:?} is not a safe directory name",
-            metadata.title
-        )
-        .into());
-    }
-
-    Ok(())
-}
-
-fn series_metadata(
-    path: &Path,
-    config: &SeriesConfig,
-    repository: &SeriesMetadataRepository,
-    resolver: &impl SeriesMetadataResolver
-) -> Result<SeriesMetadata, String> {
-    let path_str = path.to_string_lossy().to_string();
-    let metadata = repository.find_by_path(path_str.as_str()).map_err(|e| e.to_string())?;
-    if let Some(metadata) = metadata {
-        return Ok(metadata);
-    }
-
-    let metadata = match resolver.resolve(&path, &config.category) {
-        Ok(metadata) => metadata,
-        Err(error) => return Err(format!("failed resolving metadata for series {:?}: {error}", path))
-    };
-
-    validate_metadata(&metadata)?;
-    let metadata = SeriesMetadata::new(metadata.title, path_str, Some(metadata.season))?;
-    repository.save(&metadata).map_err(|e| e.to_string())?;
-    Ok(metadata)
 }

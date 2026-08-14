@@ -1,13 +1,13 @@
 use crate::anime::{AnimeRepository, AnimeRepositoryError, CachedAnimeRepository};
+use crate::config::CliConfig;
+use crate::fs::strip_illegal_chars;
 use crate::jellyfin::config::SeriesCategory;
-use crate::jellyfin::series::{ResolvedSeriesMetadata, SeriesMetadataResolver};
+use crate::media::{fetch_image_from_url, SeriesMetadata, SeriesMetadataResolver, MetadataProviderIds, Image, SeriesMetadataResolverError};
 use log::{debug, warn};
 use nenechi_myanimelist::{AnimeDetails, MediaType, RelationType};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::path::Path;
-use crate::config::CliConfig;
-use crate::fs::strip_illegal_chars;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum AnimeResolverError {
@@ -45,6 +45,16 @@ impl From<AnimeRepositoryError> for AnimeResolverError {
     }
 }
 
+impl From<AnimeResolverError> for SeriesMetadataResolverError {
+    fn from(value: AnimeResolverError) -> Self {
+        match value {
+            AnimeResolverError::EmptyTitle => SeriesMetadataResolverError::EmptyTitle,
+            AnimeResolverError::AnimeNotFound(_) => SeriesMetadataResolverError::NotFound,
+            _ => SeriesMetadataResolverError::Other(value.to_string()),
+        }
+    }
+}
+
 struct AnimeSeasonResolver<R>
 where
     R: AnimeRepository,
@@ -74,10 +84,13 @@ where
         Ok(Some(season))
     }
 
-    pub fn resolve_first_season(&self, anime_id: u64) -> Result<Option<AnimeDetails>, AnimeResolverError> {
+    pub fn resolve_first_season(
+        &self,
+        anime_id: u64,
+    ) -> Result<Option<AnimeDetails>, AnimeResolverError> {
         // first ensure this anime is not the first season, so it shouldn't have a prequel
         if let None = self.resolve_prequel(anime_id)? {
-            return Ok(self.repository.find_by_id(anime_id)?)
+            return Ok(self.repository.find_by_id(anime_id)?);
         }
 
         let mut current_anime_id = anime_id;
@@ -209,7 +222,7 @@ where
     pub fn resolve_by_title(
         &self,
         title: &str,
-    ) -> Result<ResolvedSeriesMetadata, AnimeResolverError> {
+    ) -> Result<SeriesMetadata, AnimeResolverError> {
         let anime = self.title_resolver.resolve(title)?;
         if anime.is_none() {
             return Err(AnimeResolverError::AnimeNotFound(format!(
@@ -230,10 +243,29 @@ where
             return Err(AnimeResolverError::SeasonNotFound);
         }
 
-        Ok(ResolvedSeriesMetadata {
-            title: first_season.unwrap().title,
-            season: season.unwrap(),
-        })
+        let first_season = first_season.unwrap();
+        let mut metadata: SeriesMetadata = anime.clone().into();
+        metadata.title = first_season.title;
+        metadata.original_title = first_season.alternative_titles.ja.unwrap_or_default();
+        metadata.season = season.unwrap() as u16;
+        metadata.cover = Self::fetch_cover(&anime);
+
+        Ok(metadata)
+    }
+
+    fn fetch_cover(anime: &AnimeDetails) -> Option<Image> {
+        let url = match &anime.main_picture {
+            Some(picture) => *&picture.large.as_str(),
+            None => return None,
+        };
+
+        match fetch_image_from_url(url) {
+            Ok(image) => Some(image),
+            Err(err) => {
+                warn!("failed fetching cover {}: {}", url, err);
+                None
+            }
+        }
     }
 }
 
@@ -241,21 +273,57 @@ impl<R> SeriesMetadataResolver for AnimeResolver<R>
 where
     R: AnimeRepository + Clone,
 {
-    fn resolve(
-        &self,
-        source_directory: &Path,
-        category: &SeriesCategory,
-    ) -> Result<ResolvedSeriesMetadata, Box<dyn Error>> {
-        if category != &SeriesCategory::Anime {
-            return Err(Box::new(AnimeResolverError::NotAnimeCategory));
-        }
+    fn resolve(&self, source_directory: &Path) -> Result<SeriesMetadata, SeriesMetadataResolverError> {
         let title = source_directory
             .file_name()
             .and_then(|name| name.to_str())
             .ok_or(AnimeResolverError::EmptyTitle)?;
 
-        self.resolve_by_title(title)
-            .map_err(|error| Box::new(error) as Box<dyn Error>)
+        Ok(self.resolve_by_title(title)?)
+    }
+}
+
+impl From<AnimeDetails> for SeriesMetadata {
+    fn from(details: AnimeDetails) -> Self {
+        let year = details
+            .start_season
+            .as_ref()
+            .map(|season| season.year)
+            .and_then(|year: u64| u16::try_from(year).ok())
+            .unwrap_or_default();
+
+        Self {
+            title: details.title.clone(),
+            original_title: details.alternative_titles.ja.clone().unwrap_or_default(),
+            plot: details.synopsis.unwrap_or_default(),
+            year,
+            premiered: details.start_date.unwrap_or_default(),
+            rating: details.mean.unwrap_or_default() as f32,
+            runtime: details
+                .average_episode_duration
+                .map(|seconds| seconds / 60)
+                .and_then(|minutes| u16::try_from(minutes).ok())
+                .unwrap_or_default(),
+            status: details.status,
+            genre: details.genres.into_iter().map(|genre| genre.name).collect(),
+            tag: Vec::new(),
+            studio: details
+                .studios
+                .into_iter()
+                .next()
+                .map(|studio| studio.name)
+                .unwrap_or_default(),
+            id: MetadataProviderIds {
+                mal: Some(details.id.to_string()),
+                imdb: None,
+                tmdb: None,
+            },
+            actor: Vec::new(),
+            season: 1,
+            season_title: Some(details.title),
+            season_original_title: details.alternative_titles.ja,
+            cover: None,
+        }
     }
 }
 
@@ -307,54 +375,59 @@ mod tests {
     }
 
     #[test]
-    fn anime_resolver_resolves_the_canonical_title_and_season() {
+    fn anime_details_conversion_maps_myanimelist_metadata() {
+        let details = FakeAnimeRepository::new()
+            .find_by_id(30831)
+            .unwrap()
+            .unwrap();
+
+        let metadata = SeriesMetadata::from(details);
+
+        assert_eq!(metadata.title, "Kono Subarashii Sekai ni Shukufuku wo!");
+        assert_eq!(metadata.original_title, "この素晴らしい世界に祝福を！");
+        assert_eq!(metadata.year, 2016);
+        assert_eq!(metadata.premiered, "2016-01-14");
+        assert_eq!(metadata.rating, 8.09);
+        assert_eq!(metadata.runtime, 23);
+        assert_eq!(
+            metadata.genre,
+            ["Adventure", "Comedy", "Fantasy", "Isekai", "Parody"]
+        );
+        assert_eq!(metadata.studio, "Studio Deen");
+        assert_eq!(metadata.id.mal.as_deref(), Some("30831"));
+        assert_eq!(metadata.season, 1);
+    }
+
+    #[test]
+    fn anime_resolver_maps_the_matched_anime() {
         let resolver = AnimeResolver::new(FakeAnimeRepository::new());
 
         let metadata = resolver
             .resolve_by_title("KonoSuba God's Blessing on This Wonderful World! 4")
             .unwrap();
 
-        assert_eq!(
-            metadata,
-            ResolvedSeriesMetadata {
-                title: "Kono Subarashii Sekai ni Shukufuku wo!".into(),
-                season: 4,
-            }
-        );
+        assert_eq!(metadata.title, "Kono Subarashii Sekai ni Shukufuku wo!");
+        assert_eq!(metadata.season, 4);
     }
 
     #[test]
-    fn anime_resolver_resolves_the_canonical_title_and_season_k_on_first_season() {
+    fn anime_resolver_maps_the_matched_anime_k_on_first_season() {
         let resolver = AnimeResolver::new(FakeAnimeRepository::with_search("k_on"));
 
-        let metadata = resolver
-            .resolve_by_title("K-On!")
-            .unwrap();
+        let metadata = resolver.resolve_by_title("K-On!").unwrap();
 
-        assert_eq!(
-            metadata,
-            ResolvedSeriesMetadata {
-                title: "K-On!".into(),
-                season: 1,
-            }
-        );
+        assert_eq!(metadata.title, "K-On!");
+        assert_eq!(metadata.season, 1);
     }
 
     #[test]
-    fn anime_resolver_resolves_the_canonical_title_and_season_k_on_second_season() {
+    fn anime_resolver_maps_the_matched_anime_k_on_second_season() {
         let resolver = AnimeResolver::new(FakeAnimeRepository::with_search("k_on"));
 
-        let metadata = resolver
-            .resolve_by_title("K-On!!")
-            .unwrap();
+        let metadata = resolver.resolve_by_title("K-On!!").unwrap();
 
-        assert_eq!(
-            metadata,
-            ResolvedSeriesMetadata {
-                title: "K-On!".into(),
-                season: 2,
-            }
-        );
+        assert_eq!(metadata.title, "K-On!");
+        assert_eq!(metadata.season, 2);
     }
 
     #[test]

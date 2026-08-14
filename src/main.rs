@@ -1,7 +1,18 @@
+mod anime;
+mod client;
+mod commands;
+mod config;
+mod database;
+mod fs;
+mod jellyfin;
+mod logging;
+mod schema;
+mod wallpapers;
+mod media;
+
 use clap::Parser;
-use nenechi_cli::config::{CliConfig};
-use nenechi_cli::commands::{Commands, execute_command};
-use nenechi_cli::logging;
+use config::{CliConfig};
+use commands::{Commands, execute_command};
 
 #[derive(Debug, Parser)]
 #[command(name = "nennechi-cli")]
@@ -16,7 +27,7 @@ fn main() {
     let config = CliConfig::get_instance();
     logging::configure(&config.logging).expect("failed to configure logging");
 
-    let result = execute_command(args.command);
+    let result = execute_command(&args.command);
 
     if let Err(err) = result {
         println!("{}", err);

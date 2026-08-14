@@ -5,6 +5,7 @@ use clap::Subcommand;
 use log::warn;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use crate::media::{execute_media_command, MediaCommands};
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum Commands {
@@ -16,6 +17,10 @@ pub enum Commands {
         #[command(subcommand)]
         command: WallpapersCommands,
     },
+    Media {
+        #[command(subcommand)]
+        command: MediaCommands,
+    }
 }
 
 impl Display for Commands {
@@ -23,18 +28,22 @@ impl Display for Commands {
         match self {
             Commands::Jellyfin { command: _ } => write!(f, "jellyfin"),
             Commands::Wallpapers { command: _ } => write!(f, "wallpapers"),
+            Commands::Media { command: _ } => write!(f, "media"),
         }
     }
 }
 
-pub fn execute_command(command: Commands) -> Result<(), String> {
-    let result = match command.clone() {
+pub fn execute_command(command: &Commands) -> Result<(), String> {
+    let result = match command {
         Commands::Jellyfin {
             command: subcommand,
         } => execute_jellyfin_command(subcommand),
         Commands::Wallpapers {
             command: subcommand,
         } => execute_wallpaper_command(subcommand),
+        Commands::Media {
+            command: subcommand,
+        } => execute_media_command(subcommand),
     };
 
     if let Err(err) = result {

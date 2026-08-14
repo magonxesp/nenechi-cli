@@ -31,7 +31,7 @@ impl Display for WallpapersCommands {
     }
 }
 
-pub fn execute_wallpaper_command(command: WallpapersCommands) -> Result<(), String> {
+pub fn execute_wallpaper_command(command: &WallpapersCommands) -> Result<(), String> {
     let config = WallpapersConfig::read()?;
     let ignore_patterns = config.ignore.clone();
     let directory = config.directory()?;
