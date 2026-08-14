@@ -48,33 +48,34 @@ pub fn organize(target: &TargetConfig) -> Result<usize, String> {
         debug!("scanning {:?}", series_directory);
         let files = media_files(target, &series_directory);
 
-        let season_directory = target
+        let destination_series_directory = target
             .destination
-            .join(&metadata.title)
+            .join(&metadata.title);
+        let destination_season_directory = destination_series_directory
             .join(format!("Season {:02}", metadata.season));
-        fs::create_dir_all(&season_directory).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&destination_season_directory).map_err(|e| e.to_string())?;
 
         let nfo = SeriesNfo::from(metadata.clone());
 
         if metadata.season == 1 {
-            nfo.write(&series_directory, false)?;
+            nfo.write(&destination_series_directory, false)?;
         } else {
-            nfo.write(&season_directory, true)?;
+            nfo.write(&destination_season_directory, true)?;
         }
 
         if let Some(cover) = &metadata.cover {
             if metadata.season == 1 {
-                write_poster(&series_directory, &cover)?;
-                write_poster(&season_directory, &cover)?;
+                write_poster(&destination_series_directory, &cover)?;
+                write_poster(&destination_season_directory, &cover)?;
             } else {
-                write_poster(&season_directory, &cover)?;
+                write_poster(&destination_season_directory, &cover)?;
             }
         }
 
         for file in files {
             let result = create_episode_symlink(
                 &file,
-                &season_directory,
+                &destination_season_directory,
                 &metadata,
                 &patterns
             );
