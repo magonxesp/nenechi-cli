@@ -72,13 +72,13 @@ impl FakeAnimeRepository {
 impl AnimeRepository for FakeAnimeRepository {
     fn find_by_id(&self, anime_id: u64) -> Result<Option<AnimeDetails>, AnimeRepositoryError> {
         let fixture = match anime_id {
-            30831 => include_str!("../tests/fixtures/myanimelist/anime_30831.json"),
-            32937 => include_str!("../tests/fixtures/myanimelist/anime_32937.json"),
-            38040 => include_str!("../tests/fixtures/myanimelist/anime_38040.json"),
-            49458 => include_str!("../tests/fixtures/myanimelist/anime_49458.json"),
-            61203 => include_str!("../tests/fixtures/myanimelist/anime_61203.json"),
-            5680 => include_str!("../tests/fixtures/myanimelist/anime_5680.json"),
-            7791 => include_str!("../tests/fixtures/myanimelist/anime_7791.json"),
+            30831 => include_str!("../../tests/fixtures/myanimelist/anime_30831.json"),
+            32937 => include_str!("../../tests/fixtures/myanimelist/anime_32937.json"),
+            38040 => include_str!("../../tests/fixtures/myanimelist/anime_38040.json"),
+            49458 => include_str!("../../tests/fixtures/myanimelist/anime_49458.json"),
+            61203 => include_str!("../../tests/fixtures/myanimelist/anime_61203.json"),
+            5680 => include_str!("../../tests/fixtures/myanimelist/anime_5680.json"),
+            7791 => include_str!("../../tests/fixtures/myanimelist/anime_7791.json"),
             _ => return Ok(None),
         };
 
@@ -89,10 +89,10 @@ impl AnimeRepository for FakeAnimeRepository {
 
     fn search(&self, _title: &str) -> Result<Vec<Anime>, AnimeRepositoryError> {
         let fixture: WebSearchResponse = serde_json::from_str(match self.search.as_str() {
-            "k_on" => include_str!("../tests/fixtures/myanimelist/web_search_k_on.json"),
-            _ => include_str!("../tests/fixtures/myanimelist/web_search.json")
+            "k_on" => include_str!("../../tests/fixtures/myanimelist/web_search_k_on.json"),
+            _ => include_str!("../../tests/fixtures/myanimelist/web_search.json")
         })
-        .map_err(|error| AnimeRepositoryError::Other(error.to_string()))?;
+            .map_err(|error| AnimeRepositoryError::Other(error.to_string()))?;
 
         Ok(fixture.into_anime())
     }

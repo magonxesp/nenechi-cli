@@ -1,5 +1,5 @@
 use crate::media::anime::AnimeResolver;
-use crate::media::series;
+use crate::media::{series, SeriesMetadataResolver};
 use clap::Subcommand;
 use std::fmt;
 use std::fmt::{Display, Formatter};
@@ -51,14 +51,14 @@ pub fn metadata(directory: &Option<PathBuf>, write: &bool) -> Result<(), String>
     };
 
     let resolver = AnimeResolver::build().map_err(|err| err.to_string())?;
+    let metadata = resolver.resolve(&path).map_err(|err| err.to_string())?;
 
     if !write {
-        let metadata = series::resolve_series_metadata_from_path(&path, &resolver)?;
-        println!("{}:\n{}", path.display(), metadata);
+        println!("{}:\n{}", path.display(), metadata.to_yaml()?);
         return Ok(());
     }
 
-    series::write_series_metadata_for_path(&path, &resolver)?;
+    metadata.write(&path)?;
     info!("wrote metadata to {}", path.display());
     Ok(())
 }

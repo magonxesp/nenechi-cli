@@ -5,6 +5,7 @@ use clap::Subcommand;
 use log::warn;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use crate::anime::{execute_anime_command, AnimeCommands};
 use crate::jdownloader::{execute_jdownloader_command, JDownloaderCommands};
 use crate::media::{execute_media_command, MediaCommands};
 
@@ -26,6 +27,10 @@ pub enum Commands {
     JDownloader {
         #[command(subcommand)]
         command: JDownloaderCommands,
+    },
+    Anime {
+        #[command(subcommand)]
+        command: AnimeCommands,
     }
 }
 
@@ -36,6 +41,7 @@ impl Display for Commands {
             Commands::Wallpapers { command: _ } => write!(f, "wallpapers"),
             Commands::Media { command: _ } => write!(f, "media"),
             Commands::JDownloader { command: _ } => write!(f, "jdownloader"),
+            Commands::Anime { command: _ } => write!(f, "anime"),
         }
     }
 }
@@ -54,6 +60,9 @@ pub fn execute_command(command: &Commands) -> Result<(), String> {
         Commands::JDownloader {
             command: subcommand,
         } => execute_jdownloader_command(subcommand),
+        Commands::Anime {
+            command: subcommand,
+        } => execute_anime_command(subcommand),
     };
 
     if let Err(err) = result {

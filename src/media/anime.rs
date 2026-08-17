@@ -55,16 +55,17 @@ impl From<AnimeResolverError> for SeriesMetadataResolverError {
     }
 }
 
+#[derive(Debug, Clone)]
 struct AnimeSeasonResolver<R>
 where
-    R: AnimeRepository,
+    R: AnimeRepository + Clone,
 {
     repository: R,
 }
 
 impl<R> AnimeSeasonResolver<R>
 where
-    R: AnimeRepository,
+    R: AnimeRepository + Clone,
 {
     pub fn new(repository: R) -> Self {
         Self { repository }
@@ -129,6 +130,7 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
 struct AnimeTitleResolver<R>
 where
     R: AnimeRepository,
@@ -190,9 +192,10 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct AnimeResolver<R>
 where
-    R: AnimeRepository,
+    R: AnimeRepository + Clone,
 {
     season_resolver: AnimeSeasonResolver<R>,
     title_resolver: AnimeTitleResolver<R>,

@@ -4,6 +4,8 @@ mod jdownloader;
 mod logging;
 mod myanimelist;
 mod read;
+mod osaka;
+mod media;
 
 pub use crate::wallpapers::config::*;
 pub use cli::*;

@@ -10,6 +10,7 @@ mod schema;
 mod wallpapers;
 mod media;
 mod jdownloader;
+mod osaka;
 
 use clap::Parser;
 use log::warn;

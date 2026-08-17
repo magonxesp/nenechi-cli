@@ -14,3 +14,9 @@ myanimelist:
 
 jdownloader:
   api_base_url: http://localhost:3128
+
+osaka:
+  base_url: http://localhost:8080
+
+media:
+  anime_directory: /home/user/anime

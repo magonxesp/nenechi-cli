@@ -38,7 +38,7 @@ pub fn organize(target: &TargetConfig) -> Result<usize, String> {
             continue;
         }
 
-        let metadata = media::read_series_metadata_from_path(&series_directory);
+        let metadata = SeriesMetadata::read(&series_directory);
         if let Err(err) = &metadata {
             warn!("error reading metadata: {}", err);
             continue;

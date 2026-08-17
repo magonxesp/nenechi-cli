@@ -3,6 +3,8 @@ use crate::config::{
 };
 use serde::Deserialize;
 use std::sync::OnceLock;
+use crate::config::media::MediaConfig;
+use crate::config::osaka::OsakaConfig;
 
 static CLI_CONFIG_INSTANCE: OnceLock<CliConfig> = OnceLock::new();
 
@@ -16,6 +18,10 @@ pub struct CliConfig {
     pub myanimelist: MyAnimeListConfig,
     #[serde(default)]
     pub jdownloader: JDownloaderConfig,
+    #[serde(default)]
+    pub osaka: OsakaConfig,
+    #[serde(default)]
+    pub media: MediaConfig,
 }
 
 impl CliConfig {
@@ -31,6 +37,8 @@ impl Default for CliConfig {
             database: DatabaseConfig::default(),
             myanimelist: MyAnimeListConfig::default(),
             jdownloader: JDownloaderConfig::default(),
+            osaka: OsakaConfig::default(),
+            media: MediaConfig::default(),
         }
     }
 }
