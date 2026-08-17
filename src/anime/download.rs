@@ -6,6 +6,7 @@ use crate::media::{AnimeResolver, AnimeResolverError};
 use crate::osaka::{Links, OsakaClient, OsakaError};
 use std::fmt::Display;
 use std::path::PathBuf;
+use log::debug;
 
 pub struct AnimeDownloader {
     osaka: OsakaClient,
@@ -39,16 +40,23 @@ impl AnimeDownloader {
     }
 
     pub fn download(&self, url: &str) -> Result<(), AnimeDownloadError> {
+        debug!("extracting links using Osaka: {}", url);
         let links = self.osaka.extract_links(url)?;
         let title = links.title.clone();
+        debug!("series title: {}", title);
+
         let links = Self::resolve_links(&links.links)?;
         let anime_directory = PathBuf::from(&self.config.media.anime_directory);
 
+        debug!("starting download with JDonwloader: {:?}", anime_directory);
         let sanitized_title = strip_illegal_chars(&title);
+
+        debug!("sanitized package name: {}", sanitized_title);
         let job_id = self.jdownloader.download(&links, &anime_directory, &sanitized_title)?;
         self.wait_finish_downloads(job_id)?;
 
         let downloaded_directory = anime_directory.join(&sanitized_title);
+        debug!("fetching and writing metadata: {:?}", downloaded_directory);
         let metadata = self.resolver.resolve_by_title(&title)?;
         metadata.write(&downloaded_directory)
             .map_err(|err| AnimeDownloadError::Metadata(format!("error writing metadata: {}", err)))?;
@@ -57,19 +65,24 @@ impl AnimeDownloader {
     }
 
     fn wait_finish_downloads(&self, job_id: JobId) -> Result<(), AnimeDownloadError> {
+        debug!("waiting for download finish: {}", job_id);
+
         loop {
             let progress = self.jdownloader.check_progress(job_id)?;
             let not_finished = progress.iter().any(|download| !download.finished);
 
             if !not_finished {
+                debug!("download finished: {}", job_id);
                 return Ok(());
             }
 
+            debug!("waiting 3 seconds for check download status: {}", job_id);
             std::thread::sleep(std::time::Duration::from_secs(3));
         }
     }
 
     fn resolve_links(links: &Links) -> Result<Vec<String>, AnimeDownloadError> {
+        debug!("resolving preferred download platform links: {:?}", links);
         let links = links.mega.clone()
             .or(links.pdrain.clone())
             .or(links.mp4upload.clone())
@@ -87,7 +100,10 @@ impl AnimeDownloader {
             return Err(AnimeDownloadError::LinksNotAvailable("no SUB links found".to_string()));
         }
 
-        Ok(links.unwrap())
+        let links = links.unwrap();
+        debug!("preferred links: {:?}", links);
+
+        Ok(links)
     }
 }
 
