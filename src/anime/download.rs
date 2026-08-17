@@ -53,7 +53,7 @@ impl AnimeDownloader {
 
         debug!("sanitized package name: {}", sanitized_title);
         let job_id = self.jdownloader.download(&links, &anime_directory, &sanitized_title)?;
-        self.wait_finish_downloads(job_id)?;
+        self.wait_finish_downloads(job_id, links)?;
 
         let downloaded_directory = anime_directory.join(&sanitized_title);
         debug!("fetching and writing metadata: {:?}", downloaded_directory);
@@ -64,14 +64,27 @@ impl AnimeDownloader {
         Ok(())
     }
 
-    fn wait_finish_downloads(&self, job_id: JobId) -> Result<(), AnimeDownloadError> {
+    fn wait_finish_downloads(&self, job_id: JobId, links: Vec<String>) -> Result<(), AnimeDownloadError> {
         debug!("waiting for download finish: {}", job_id);
 
         loop {
             let progress = self.jdownloader.check_progress(job_id)?;
-            let not_finished = progress.iter().any(|download| !download.finished);
+            if progress.is_empty() {
+                debug!("downloads haven't started yet, waiting 3 seconds to next check: {}", job_id);
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                continue;
+            }
 
-            if !not_finished {
+            let mut finished = 0;
+
+            for item in progress {
+                if item.finished {
+                    finished += 1;
+                }
+            }
+
+            debug!("downloads finished {} of {}", finished, links.len());
+            if finished == links.len() {
                 debug!("download finished: {}", job_id);
                 return Ok(());
             }
