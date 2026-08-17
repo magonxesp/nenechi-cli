@@ -11,3 +11,6 @@ database:
 myanimelist:
   # Client ID de la API v2 de MyAnimeList.
   api_key: your-client-id
+
+jdownloader:
+  api_base_url: http://localhost:3128

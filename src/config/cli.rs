@@ -1,4 +1,6 @@
-use crate::config::{DatabaseConfig, LoggingConfig, MyAnimeListConfig, read_config};
+use crate::config::{
+    DatabaseConfig, JDownloaderConfig, LoggingConfig, MyAnimeListConfig, read_config,
+};
 use serde::Deserialize;
 use std::sync::OnceLock;
 
@@ -12,6 +14,8 @@ pub struct CliConfig {
     pub database: DatabaseConfig,
     #[serde(default)]
     pub myanimelist: MyAnimeListConfig,
+    #[serde(default)]
+    pub jdownloader: JDownloaderConfig,
 }
 
 impl CliConfig {
@@ -26,6 +30,7 @@ impl Default for CliConfig {
             logging: LoggingConfig::default(),
             database: DatabaseConfig::default(),
             myanimelist: MyAnimeListConfig::default(),
+            jdownloader: JDownloaderConfig::default(),
         }
     }
 }
@@ -40,5 +45,20 @@ mod tests {
             serde_yaml::from_str(include_str!("../../examples/config.yaml")).unwrap();
 
         assert_eq!(config.myanimelist.api_key, "your-client-id");
+    }
+
+    #[test]
+    fn parses_jdownloader_api_base_url_from_example_config() {
+        let config: CliConfig =
+            serde_yaml::from_str(include_str!("../../examples/config.yaml")).unwrap();
+
+        assert_eq!(config.jdownloader.api_base_url, "http://localhost:3128");
+    }
+
+    #[test]
+    fn uses_default_jdownloader_config_when_section_is_missing() {
+        let config: CliConfig = serde_yaml::from_str("{}").unwrap();
+
+        assert_eq!(config.jdownloader.api_base_url, "http://localhost:3128");
     }
 }

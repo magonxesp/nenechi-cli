@@ -1591,7 +1591,7 @@ dependencies = [
 
 [[package]]
 name = "nenechi-cli"
-version = "0.2.9"
+version = "0.2.11"
 dependencies = [
  "clap",
  "diesel",
@@ -2227,6 +2227,9 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
  "sync_wrapper 1.0.2",
  "tokio",
  "tokio-rustls",

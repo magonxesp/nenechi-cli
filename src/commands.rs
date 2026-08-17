@@ -5,6 +5,7 @@ use clap::Subcommand;
 use log::warn;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use crate::jdownloader::{execute_jdownloader_command, JDownloaderCommands};
 use crate::media::{execute_media_command, MediaCommands};
 
 #[derive(Clone, Debug, Subcommand)]
@@ -20,6 +21,11 @@ pub enum Commands {
     Media {
         #[command(subcommand)]
         command: MediaCommands,
+    },
+    #[command(name = "jdownloader")]
+    JDownloader {
+        #[command(subcommand)]
+        command: JDownloaderCommands,
     }
 }
 
@@ -29,6 +35,7 @@ impl Display for Commands {
             Commands::Jellyfin { command: _ } => write!(f, "jellyfin"),
             Commands::Wallpapers { command: _ } => write!(f, "wallpapers"),
             Commands::Media { command: _ } => write!(f, "media"),
+            Commands::JDownloader { command: _ } => write!(f, "jdownloader"),
         }
     }
 }
@@ -44,11 +51,13 @@ pub fn execute_command(command: &Commands) -> Result<(), String> {
         Commands::Media {
             command: subcommand,
         } => execute_media_command(subcommand),
+        Commands::JDownloader {
+            command: subcommand,
+        } => execute_jdownloader_command(subcommand),
     };
 
     if let Err(err) = result {
-        warn!("command {} failed: {}", command.to_string(), err);
-        return Err(err.to_string());
+        return Err(format!("command {} failed: {}", command.to_string(), err));
     }
 
     Ok(())

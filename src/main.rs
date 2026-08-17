@@ -9,8 +9,10 @@ mod logging;
 mod schema;
 mod wallpapers;
 mod media;
+mod jdownloader;
 
 use clap::Parser;
+use log::warn;
 use config::{CliConfig};
 use commands::{Commands, execute_command};
 
@@ -30,7 +32,7 @@ fn main() {
     let result = execute_command(&args.command);
 
     if let Err(err) = result {
-        println!("{}", err);
+        warn!("{}", err);
         std::process::exit(1);
     }
 }
