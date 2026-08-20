@@ -85,5 +85,6 @@ impl Display for SeriesMetadataResolverError {
 impl Error for SeriesMetadataResolverError {}
 
 pub trait SeriesMetadataResolver {
-    fn resolve(&self, source_directory: &Path) -> Result<SeriesMetadata, SeriesMetadataResolverError>;
+    fn resolve_from_directory(&self, source_directory: &Path) -> Result<SeriesMetadata, SeriesMetadataResolverError>;
+    fn resolve_from_identifier(&self, identifier: &str) -> Result<SeriesMetadata, SeriesMetadataResolverError>;
 }

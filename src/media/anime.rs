@@ -94,22 +94,18 @@ where
             return Ok(self.repository.find_by_id(anime_id)?);
         }
 
-        let mut current_anime_id = anime_id;
+        let mut next_anime_id = anime_id;
+        let mut first_season: Option<AnimeDetails> = None;
 
-        while let Some(prequel) = self.resolve_prequel(current_anime_id)? {
-            current_anime_id = prequel.id;
+        while let Some(prequel) = self.resolve_prequel(next_anime_id)? {
+            if prequel.media_type == MediaType::Tv {
+                first_season = Some(prequel.clone());
+            }
+
+            next_anime_id = prequel.id;
         }
 
-        let first_season = match self.repository.find_by_id(current_anime_id)? {
-            Some(season) => season,
-            None => return Ok(None),
-        };
-
-        if first_season.media_type == MediaType::Tv {
-            Ok(Some(first_season))
-        } else {
-            Ok(None)
-        }
+        Ok(first_season)
     }
 
     fn resolve_prequel(&self, anime_id: u64) -> Result<Option<AnimeDetails>, AnimeResolverError> {
@@ -199,6 +195,7 @@ where
 {
     season_resolver: AnimeSeasonResolver<R>,
     title_resolver: AnimeTitleResolver<R>,
+    repository: R,
 }
 
 impl AnimeResolver<CachedAnimeRepository> {
@@ -219,6 +216,7 @@ where
         Self {
             season_resolver: AnimeSeasonResolver::new(repository.clone()),
             title_resolver: AnimeTitleResolver::new(repository.clone()),
+            repository,
         }
     }
 
@@ -235,6 +233,10 @@ where
         }
 
         let anime = anime.unwrap();
+        Ok(self.build_metadata(&anime)?)
+    }
+
+    fn build_metadata(&self, anime: &AnimeDetails) -> Result<SeriesMetadata, AnimeResolverError> {
         let season = self.season_resolver.resolve(anime.id)?;
         if season.is_none() {
             return Err(AnimeResolverError::SeasonNotFound);
@@ -242,7 +244,7 @@ where
 
         let first_season = self.season_resolver.resolve_first_season(anime.id)?;
         if first_season.is_none() {
-            warn!("first season not found for: {}", title);
+            warn!("first season not found for: {}", anime.title);
             return Err(AnimeResolverError::SeasonNotFound);
         }
 
@@ -276,13 +278,30 @@ impl<R> SeriesMetadataResolver for AnimeResolver<R>
 where
     R: AnimeRepository + Clone,
 {
-    fn resolve(&self, source_directory: &Path) -> Result<SeriesMetadata, SeriesMetadataResolverError> {
+    fn resolve_from_directory(&self, source_directory: &Path) -> Result<SeriesMetadata, SeriesMetadataResolverError> {
         let title = source_directory
             .file_name()
             .and_then(|name| name.to_str())
             .ok_or(AnimeResolverError::EmptyTitle)?;
 
         Ok(self.resolve_by_title(title)?)
+    }
+
+    fn resolve_from_identifier(&self, identifier: &str) -> Result<SeriesMetadata, SeriesMetadataResolverError> {
+        let id = identifier.parse::<u64>().map_err(|err| {
+            SeriesMetadataResolverError::Other(format!("failed parse id: {}: {}", identifier, err))
+        })?;
+
+        let anime = self.repository.find_by_id(id)
+            .map_err(|err| SeriesMetadataResolverError::Other(err.to_string()))?;
+
+        if anime.is_none() {
+            warn!("no anime found for: {}", identifier);
+            return Err(SeriesMetadataResolverError::NotFound);
+        }
+
+        let anime = anime.unwrap();
+        Ok(self.build_metadata(&anime)?)
     }
 }
 
@@ -431,6 +450,16 @@ mod tests {
 
         assert_eq!(metadata.title, "K-On!");
         assert_eq!(metadata.season, 2);
+    }
+
+    #[test]
+    fn anime_resolver_maps_the_matched_anime_k_on_first_season_by_id() {
+        let resolver = AnimeResolver::new(FakeAnimeRepository::with_search("k_on"));
+
+        let metadata = resolver.resolve_from_identifier("5680").unwrap();
+
+        assert_eq!(metadata.title, "K-On!");
+        assert_eq!(metadata.season, 1);
     }
 
     #[test]
