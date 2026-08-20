@@ -89,13 +89,8 @@ where
         &self,
         anime_id: u64,
     ) -> Result<Option<AnimeDetails>, AnimeResolverError> {
-        // first ensure this anime is not the first season, so it shouldn't have a prequel
-        if let None = self.resolve_prequel(anime_id)? {
-            return Ok(self.repository.find_by_id(anime_id)?);
-        }
-
         let mut next_anime_id = anime_id;
-        let mut first_season: Option<AnimeDetails> = None;
+        let mut first_season = self.repository.find_by_id(anime_id)?;
 
         while let Some(prequel) = self.resolve_prequel(next_anime_id)? {
             if prequel.media_type == MediaType::Tv {
@@ -459,6 +454,16 @@ mod tests {
         let metadata = resolver.resolve_from_identifier("5680").unwrap();
 
         assert_eq!(metadata.title, "K-On!");
+        assert_eq!(metadata.season, 1);
+    }
+
+    #[test]
+    fn anime_resolver_maps_the_matched_anime_nichijou_first_season_by_id() {
+        let resolver = AnimeResolver::new(FakeAnimeRepository::new());
+
+        let metadata = resolver.resolve_from_identifier("10165").unwrap();
+
+        assert_eq!(metadata.title, "Nichijou");
         assert_eq!(metadata.season, 1);
     }
 

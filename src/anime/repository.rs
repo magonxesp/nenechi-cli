@@ -79,6 +79,8 @@ impl AnimeRepository for FakeAnimeRepository {
             61203 => include_str!("../../tests/fixtures/myanimelist/anime_61203.json"),
             5680 => include_str!("../../tests/fixtures/myanimelist/anime_5680.json"),
             7791 => include_str!("../../tests/fixtures/myanimelist/anime_7791.json"),
+            8857 => include_str!("../../tests/fixtures/myanimelist/anime_8857.json"),
+            10165 => include_str!("../../tests/fixtures/myanimelist/anime_10165.json"),
             _ => return Ok(None),
         };
 
