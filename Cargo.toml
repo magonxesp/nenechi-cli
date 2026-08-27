@@ -34,6 +34,7 @@ serial_test = "3.2.0"
 dotenvy = "0.15.7"
 reqwest = { version = "0.13.4", features = ["blocking", "query", "json"] }
 quick-xml = { version = "0.41.0", features = ["serialize"] }
+chrono = "0.4.45"
 
 [dev-dependencies]
 tempfile = "3.20"

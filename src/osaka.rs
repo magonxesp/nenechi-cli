@@ -54,10 +54,17 @@ impl OsakaClient {
         Self::new(&config.osaka.base_url)
     }
 
-    pub fn extract_links(&self, url: &str) -> Result<OsakaResponse, OsakaError> {
+    pub fn extract_links(&self, url: &str, start_from: Option<usize>) -> Result<OsakaResponse, OsakaError> {
+        let mut query = vec![("url", url.to_string())];
+
+        if let Some(start_from) = start_from {
+            let start_from = start_from.to_string();
+            query.push(("startFrom", start_from))
+        }
+
         let links = self.client
             .get(format!("{}/links", self.base_url))
-            .query(&[("url", url)])
+            .query(&query)
             .send()?
             .error_for_status()?
             .json::<OsakaResponse>()?;

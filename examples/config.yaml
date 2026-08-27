@@ -19,4 +19,8 @@ osaka:
   base_url: http://localhost:8080
 
 media:
-  anime_directory: /home/user/anime
+  anime:
+    directory: /home/user/anime
+    episodes_whitelist:
+      - '*.mp4'
+      - '*.avi'

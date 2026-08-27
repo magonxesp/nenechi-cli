@@ -14,6 +14,8 @@ struct AddLinksQuery {
     destination_folder: String,
     #[serde(rename = "assignJobID")]
     assign_job_id: bool,
+    #[serde(rename = "overwritePackagizerRules")]
+    overwrite_packagizer_rules: bool,
 }
 
 pub type JobId = i64;
@@ -101,6 +103,7 @@ impl JDownloader {
             package_name: package_name.clone(),
             destination_folder: destination.to_string_lossy().to_string(),
             assign_job_id: true,
+            overwrite_packagizer_rules: true,
         };
 
         let query = serde_json::to_string(&query)?;

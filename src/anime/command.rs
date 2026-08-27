@@ -10,6 +10,9 @@ use crate::jdownloader::{JDownloader, JobId};
 pub enum AnimeCommands {
     Download {
         url: String,
+
+        #[arg(short, long)]
+        incremental: bool,
     }
 }
 
@@ -23,7 +26,7 @@ impl Display for AnimeCommands {
 
 pub fn execute_anime_command(command: &AnimeCommands) -> Result<(), String> {
     let result = match command {
-        AnimeCommands::Download { url } => download(url),
+        AnimeCommands::Download { url, incremental } => download(url, incremental),
     };
 
     result
@@ -31,10 +34,10 @@ pub fn execute_anime_command(command: &AnimeCommands) -> Result<(), String> {
         .map_err(|error| format!("subcommand {} failed: {error}", command))
 }
 
-fn download(url: &String) -> Result<(), String> {
+fn download(url: &String, incremental: &bool) -> Result<(), String> {
     let config = CliConfig::get_instance();
     let downloader = AnimeDownloader::from_config(config)
         .map_err(|e| format!("failed to create anime downloader: {}", e))?;
 
-    downloader.download(url).map_err(|error| format!("downloader failed: {error}"))
+    downloader.download(url, *incremental).map_err(|error| format!("downloader failed: {error}"))
 }

@@ -1,21 +1,42 @@
 use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
+pub struct MediaAnimeConfig {
+    #[serde(default = "MediaAnimeConfig::default_directory")]
+    pub directory: String,
+    #[serde(default = "MediaAnimeConfig::default_episode_whitelist")]
+    pub episodes_whitelist: Vec<String>,
+}
+
+impl Default for MediaAnimeConfig {
+    fn default() -> Self {
+        Self {
+            directory: Self::default_directory(),
+            episodes_whitelist: Self::default_episode_whitelist(),
+        }
+    }
+}
+
+impl MediaAnimeConfig {
+    fn default_directory() -> String {
+        String::from("")
+    }
+
+    fn default_episode_whitelist() -> Vec<String> {
+        Vec::new()
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct MediaConfig {
-    #[serde(default = "MediaConfig::default_anime_directory")]
-    pub anime_directory: String,
+    #[serde(default)]
+    pub anime: MediaAnimeConfig,
 }
 
 impl Default for MediaConfig {
     fn default() -> Self {
         Self {
-            anime_directory: Self::default_anime_directory(),
+            anime: MediaAnimeConfig::default(),
         }
-    }
-}
-
-impl MediaConfig {
-    fn default_anime_directory() -> String {
-        String::from("")
     }
 }
